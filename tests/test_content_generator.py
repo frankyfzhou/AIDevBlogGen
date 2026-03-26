@@ -65,7 +65,7 @@ class TestBlogPostModel:
 # ── Generation tests (mocked OpenAI) ────────────────────────────────────────
 
 class TestGenerateBlogPost:
-    @patch("src.content_generator.OPENAI_API_KEY", "sk-test-key")
+    @patch("src.content_generator.LLM_API_KEY", "test-key")
     @patch("src.content_generator.OpenAI")
     def test_successful_generation(self, mock_openai_cls):
         # Build mock response chain
@@ -104,16 +104,16 @@ class TestGenerateBlogPost:
         assert len(result.sections) == 2
         mock_client.beta.chat.completions.parse.assert_called_once()
 
-    @patch("src.content_generator.OPENAI_API_KEY", "")
+    @patch("src.content_generator.LLM_API_KEY", "")
     def test_missing_api_key_raises(self):
         items = [
             NewsItem("Story", "https://a.com", "HN", "",
                      datetime.now(timezone.utc), 0.5, []),
         ]
-        with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        with pytest.raises(RuntimeError, match="LLM_API_KEY"):
             generate_blog_post(items)
 
-    @patch("src.content_generator.OPENAI_API_KEY", "sk-test-key")
+    @patch("src.content_generator.LLM_API_KEY", "test-key")
     @patch("src.content_generator.OpenAI")
     def test_empty_parsed_raises(self, mock_openai_cls):
         mock_message = MagicMock()

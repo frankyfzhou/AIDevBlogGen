@@ -1,14 +1,15 @@
 """LLM-powered blog post generation from ranked news items."""
 from __future__ import annotations
 
+import json
 import logging
 import time
 from datetime import datetime, timezone
 
-from openai import OpenAI, RateLimitError
+from openai import OpenAI, RateLimitError, BadRequestError
 from pydantic import BaseModel
 
-from .config import OPENAI_API_KEY, OPENAI_MODEL, NewsItem
+from .config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, NewsItem
 
 logger = logging.getLogger(__name__)
 
@@ -92,40 +93,72 @@ that developers can try.
 
 def generate_blog_post(news_items: list[NewsItem]) -> BlogPost:
     """Generate a structured blog post from ranked news items using the LLM."""
-    if not OPENAI_API_KEY:
+    if not LLM_API_KEY:
         raise RuntimeError(
-            "OPENAI_API_KEY is not set. Add it to your .env file or environment."
+            "LLM_API_KEY is not set. Add it to your .env file or environment."
         )
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
 
-    logger.info("Generating blog post with %s from %d news items...", OPENAI_MODEL, len(news_items))
+    logger.info("Generating blog post with %s from %d news items...", LLM_MODEL, len(news_items))
 
     max_retries = 5
+    use_structured = True
+
     for attempt in range(max_retries):
         try:
-            response = client.beta.chat.completions.parse(
-                model=OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": _build_user_prompt(news_items)},
-                ],
-                response_format=BlogPost,
-                temperature=0.7,
-                max_tokens=4096,
-            )
-            break
+            if use_structured:
+                response = client.beta.chat.completions.parse(
+                    model=LLM_MODEL,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": _build_user_prompt(news_items)},
+                    ],
+                    response_format=BlogPost,
+                    temperature=0.7,
+                    max_tokens=4096,
+                )
+                post = response.choices[0].message.parsed
+                if post is not None:
+                    logger.info("Generated post: %s (%d sections)", post.title, len(post.sections))
+                    return post
+                raise RuntimeError("LLM returned empty structured output.")
+            else:
+                # Fallback: JSON mode with manual parsing
+                json_instruction = (
+                    "\n\nIMPORTANT: Respond ONLY with a valid JSON object matching this schema:\n"
+                    '{"title": "string", "description": "string", "tags": ["string"], '
+                    '"introduction": "string", "sections": [{"heading": "string", "body": "string"}], '
+                    '"conclusion": "string"}\n'
+                    "No markdown, no code fences, just raw JSON."
+                )
+                response = client.chat.completions.create(
+                    model=LLM_MODEL,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT + json_instruction},
+                        {"role": "user", "content": _build_user_prompt(news_items)},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.7,
+                    max_tokens=4096,
+                )
+                raw = response.choices[0].message.content
+                data = json.loads(raw)
+                post = BlogPost(**data)
+                logger.info("Generated post (json fallback): %s (%d sections)", post.title, len(post.sections))
+                return post
+        except BadRequestError as exc:
+            if "response format" in str(exc).lower() or "json_schema" in str(exc).lower():
+                logger.info("Structured output not supported, falling back to JSON mode")
+                use_structured = False
+                continue
+            raise
         except RateLimitError as exc:
-            wait = 2 ** attempt * 5  # 5, 10, 20, 40, 80 seconds
+            wait = 2 ** attempt * 5
             if attempt == max_retries - 1:
-                raise RuntimeError(f"OpenAI rate limit exceeded after {max_retries} retries: {exc}") from exc
+                raise RuntimeError(f"Rate limit exceeded after {max_retries} retries: {exc}") from exc
             logger.warning("Rate limited (attempt %d/%d). Waiting %ds...", attempt + 1, max_retries, wait)
             time.sleep(wait)
 
-    post = response.choices[0].message.parsed
-    if post is None:
-        # Fallback: try to extract from content if structured parsing failed
-        raise RuntimeError("LLM returned empty structured output. Check model compatibility.")
-
-    logger.info("Generated post: %s (%d sections)", post.title, len(post.sections))
+    raise RuntimeError("Blog generation failed after all retries.")
     return post

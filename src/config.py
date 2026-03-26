@@ -16,9 +16,11 @@ BLOG_CONTENT_DIR = ROOT_DIR / "blog" / "content" / "posts"
 TEMPLATE_DIR = ROOT_DIR / "templates"
 CACHE_DIR = ROOT_DIR / ".cache"
 
-# ── API Keys ─────────────────────────────────────────────────────────────────
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+# ── LLM Configuration ────────────────────────────────────────────────────────
+# Supports OpenAI or any OpenAI-compatible API (e.g. Google Gemini)
+LLM_API_KEY = os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gemini-2.0-flash"))
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
 
 # ── Fetcher Settings ─────────────────────────────────────────────────────────
 MAX_STORIES = 8  # Top N stories to include in a blog post

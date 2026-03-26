@@ -30,7 +30,7 @@ jobs:
       - name: Generate blog post
         run: python -m src.main --no-push --verbose
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
 
       - name: Commit and push new post
         uses: stefanzweifel/git-auto-commit-action@v5
