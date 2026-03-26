@@ -52,6 +52,13 @@ Writing guidelines:
 - For each story: explain WHAT happened, WHY it matters for developers, and HOW they can use it
 - Include concrete code snippets, tool commands, or practical examples where relevant
 - Use markdown formatting (code blocks with language tags, bold for emphasis, links)
+- Include 1-2 Mermaid diagrams where they help explain architecture, workflows, or pipelines. \
+Use standard markdown code fences with the "mermaid" language tag, e.g.:
+  ```mermaid
+  graph LR
+    A[User Prompt] --> B[LLM] --> C[Generated Code]
+  ```
+  Good use cases: tool pipelines, data flow, comparison charts, decision trees, system architecture
 - IMPORTANT: Use inline hyperlinks to cite sources throughout the text, e.g. [according to OpenAI](https://openai.com/blog/...)
 - Every claim or news item MUST link back to its original source URL inline
 - Keep the total post between 1500-2500 words
