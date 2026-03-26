@@ -85,18 +85,19 @@ class TestRenderBlogPost:
         rendered = render_blog_post(self._make_post())
         assert "cover:" in rendered
         assert "image:" in rendered
-        assert "unsplash" in rendered.lower()
+        assert "picsum.photos" in rendered
 
 
-class TestUnsplashCoverUrl:
+class TestCoverUrl:
     def test_keywords_in_url(self):
         url = _unsplash_cover_url("robot coding")
-        assert "unsplash" in url
+        assert "picsum.photos" in url
         assert "robot" in url
 
     def test_empty_keywords_fallback(self):
         url = _unsplash_cover_url("")
-        assert "unsplash" in url
+        assert "picsum.photos" in url
+        assert "/seed/ai/" in url
 
 
 # ── Write post tests ─────────────────────────────────────────────────────────

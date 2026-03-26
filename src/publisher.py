@@ -26,9 +26,10 @@ def _slugify(text: str) -> str:
 
 
 def _unsplash_cover_url(keywords: str) -> str:
-    """Build a free Unsplash image URL from keywords."""
-    q = quote(keywords.strip())
-    return f"https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80"  if not q else f"https://source.unsplash.com/1200x630/?{q}"
+    """Build a cover image URL. Uses picsum.photos with a seed derived from keywords."""
+    # picsum.photos is reliable, free, no API key, and seed ensures consistency
+    seed = quote(keywords.strip()) if keywords.strip() else "ai"
+    return f"https://picsum.photos/seed/{seed}/1200/630"
 
 
 def render_blog_post(post: BlogPost) -> str:

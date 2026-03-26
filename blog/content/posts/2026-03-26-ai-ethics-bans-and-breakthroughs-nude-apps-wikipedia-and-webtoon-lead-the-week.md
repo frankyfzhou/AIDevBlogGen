@@ -15,9 +15,9 @@ ShowReadingTime: true
 ShowShareButtons: true
 ShowPostNavLinks: true
 cover:
-  image: "https://source.unsplash.com/1200x630/?AI%20ethics"
+  image: "https://picsum.photos/seed/AI%20ethics/1200/630"
   alt: "AI Ethics, Bans, and Breakthroughs: Nude Apps, Wikipedia, and Webtoon Lead the Week"
-  caption: "Photo from [Unsplash](https://unsplash.com)"
+  caption: ""
   relative: false
 ---
 
