@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from pydantic import BaseModel
 
 from .config import OPENAI_API_KEY, OPENAI_MODEL, NewsItem
@@ -100,16 +101,26 @@ def generate_blog_post(news_items: list[NewsItem]) -> BlogPost:
 
     logger.info("Generating blog post with %s from %d news items...", OPENAI_MODEL, len(news_items))
 
-    response = client.beta.chat.completions.parse(
-        model=OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user_prompt(news_items)},
-        ],
-        response_format=BlogPost,
-        temperature=0.7,
-        max_tokens=4096,
-    )
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            response = client.beta.chat.completions.parse(
+                model=OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": _build_user_prompt(news_items)},
+                ],
+                response_format=BlogPost,
+                temperature=0.7,
+                max_tokens=4096,
+            )
+            break
+        except RateLimitError as exc:
+            wait = 2 ** attempt * 5  # 5, 10, 20, 40, 80 seconds
+            if attempt == max_retries - 1:
+                raise RuntimeError(f"OpenAI rate limit exceeded after {max_retries} retries: {exc}") from exc
+            logger.warning("Rate limited (attempt %d/%d). Waiting %ds...", attempt + 1, max_retries, wait)
+            time.sleep(wait)
 
     post = response.choices[0].message.parsed
     if post is None:

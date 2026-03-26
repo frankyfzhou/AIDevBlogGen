@@ -67,7 +67,16 @@ def _read_cache(label: str) -> list[dict[str, Any]] | None:
         cached_at = data.get("cached_at", 0)
         if time.time() - cached_at > CACHE_TTL_HOURS * 3600:
             return None
-        return data.get("items", [])
+        items = data.get("items", [])
+        # Parse date strings back to datetime objects
+        for item in items:
+            pd = item.get("published_date")
+            if pd and isinstance(pd, str):
+                try:
+                    item["published_date"] = datetime.fromisoformat(pd)
+                except ValueError:
+                    item["published_date"] = None
+        return items
     except Exception:
         return None
 
