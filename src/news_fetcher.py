@@ -7,7 +7,7 @@ import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
@@ -17,6 +17,7 @@ import requests
 
 from .config import (
     AI_KEYWORDS,
+    BLOG_CONTENT_DIR,
     CACHE_DIR,
     CACHE_TTL_HOURS,
     DEVTO_API_URL,
@@ -348,8 +349,49 @@ def _compute_final_score(item: NewsItem) -> float:
     return (kw * 0.35) + (recency * 0.30) + (engagement * 0.35)
 
 
+def _get_cutoff_date() -> datetime:
+    """Determine the news cutoff date based on the last published blog post.
+
+    If <1 month since last post: use last post date as cutoff.
+    If >1 month or no posts: use 1 month ago.
+    """
+    one_month_ago = datetime.now(timezone.utc) - timedelta(days=30)
+
+    try:
+        posts = sorted(BLOG_CONTENT_DIR.glob("*.md"), reverse=True)
+        for post_path in posts:
+            if post_path.name == ".gitkeep":
+                continue
+            # Parse date from filename: YYYY-MM-DD-slug.md
+            parts = post_path.stem.split("-", 3)
+            if len(parts) >= 3:
+                try:
+                    post_date = datetime(int(parts[0]), int(parts[1]), int(parts[2]), tzinfo=timezone.utc)
+                    if post_date >= one_month_ago:
+                        logger.info("Last post date: %s — fetching news since then", post_date.date())
+                        return post_date
+                except (ValueError, IndexError):
+                    continue
+    except Exception as exc:
+        logger.warning("Could not read posts directory: %s", exc)
+
+    logger.info("No recent posts found — fetching news from last 30 days")
+    return one_month_ago
+
+
+def _is_within_window(item: NewsItem, cutoff: datetime) -> bool:
+    """Check if a news item was published after the cutoff date."""
+    if item.published_date is None:
+        return True  # Keep items with unknown dates
+    dt = item.published_date
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt >= cutoff
+
+
 def fetch_all_news() -> list[NewsItem]:
     """Fetch from all sources, deduplicate, rank, and return top stories."""
+    cutoff = _get_cutoff_date()
     all_items: list[NewsItem] = []
 
     # Run all fetchers in parallel
@@ -369,6 +411,10 @@ def fetch_all_news() -> list[NewsItem]:
                 logger.error("Fetcher failed: %s", exc)
 
     logger.info("Total raw items: %d", len(all_items))
+
+    # Filter to time window
+    all_items = [item for item in all_items if _is_within_window(item, cutoff)]
+    logger.info("After time filter (since %s): %d", cutoff.date(), len(all_items))
 
     # Deduplicate
     unique = _deduplicate(all_items)
