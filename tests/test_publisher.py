@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.content_generator import BlogPost, BlogSection, SourceLink
-from src.publisher import _slugify, _unsplash_cover_url, git_commit_and_push, render_blog_post, write_post
+from src.publisher import _slugify, _cover_image_url, git_commit_and_push, render_blog_post, write_post
 
 
 # ── Slugify tests ────────────────────────────────────────────────────────────
@@ -85,19 +85,18 @@ class TestRenderBlogPost:
         rendered = render_blog_post(self._make_post())
         assert "cover:" in rendered
         assert "image:" in rendered
-        assert "picsum.photos" in rendered
+        assert "images.unsplash.com" in rendered
 
 
 class TestCoverUrl:
     def test_keywords_in_url(self):
-        url = _unsplash_cover_url("robot coding")
-        assert "picsum.photos" in url
-        assert "robot" in url
+        url = _cover_image_url("robot coding")
+        assert "images.unsplash.com" in url
+        assert "w=1200" in url
 
     def test_empty_keywords_fallback(self):
-        url = _unsplash_cover_url("")
-        assert "picsum.photos" in url
-        assert "/seed/ai/" in url
+        url = _cover_image_url("")
+        assert "images.unsplash.com" in url
 
 
 # ── Write post tests ─────────────────────────────────────────────────────────

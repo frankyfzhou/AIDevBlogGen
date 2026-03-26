@@ -6,7 +6,6 @@ import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -25,11 +24,22 @@ def _slugify(text: str) -> str:
     return text[:80].strip("-")
 
 
-def _unsplash_cover_url(keywords: str) -> str:
-    """Build a cover image URL. Uses picsum.photos with a seed derived from keywords."""
-    # picsum.photos is reliable, free, no API key, and seed ensures consistency
-    seed = quote(keywords.strip()) if keywords.strip() else "ai"
-    return f"https://picsum.photos/seed/{seed}/1200/630"
+_COVER_PHOTOS = [
+    "photo-1677442136019-21780ecad995",  # AI neural network visual
+    "photo-1620712943543-bcc4688e7485",  # AI brain concept
+    "photo-1655720828018-edd2daec9349",  # AI abstract
+    "photo-1526374965328-7f61d4dc18c5",  # code matrix
+    "photo-1518770660439-4636190af475",  # circuit board
+    "photo-1555255707-c07966088b7b",     # technology abstract
+    "photo-1485827404703-89b55fcc595e",  # futuristic
+    "photo-1504639725590-34d0984388bd",  # coding laptop
+]
+
+
+def _cover_image_url(keywords: str) -> str:
+    """Pick a direct Unsplash image URL based on keywords hash. No redirect, always loads."""
+    idx = hash(keywords.strip() or "ai") % len(_COVER_PHOTOS)
+    return f"https://images.unsplash.com/{_COVER_PHOTOS[idx]}?w=1200&h=630&fit=crop&q=80"
 
 
 def render_blog_post(post: BlogPost) -> str:
@@ -41,7 +51,7 @@ def render_blog_post(post: BlogPost) -> str:
     template = env.get_template("blog_post.md.j2")
 
     now = datetime.now(timezone.utc)
-    cover_url = _unsplash_cover_url(getattr(post, "cover_keywords", "artificial intelligence"))
+    cover_url = _cover_image_url(getattr(post, "cover_keywords", "artificial intelligence"))
 
     return template.render(
         title=post.title,
