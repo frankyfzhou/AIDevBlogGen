@@ -18,7 +18,7 @@ Every Monday at 9 AM UTC, a GitHub Actions workflow:
 
 ```bash
 # 1. Clone and set up
-git clone https://github.com/YOURUSERNAME/AIDevBlogGen.git
+git clone https://github.com/frankyfzhou/AIDevBlogGen.git
 cd AIDevBlogGen
 
 # 2. Install Hugo

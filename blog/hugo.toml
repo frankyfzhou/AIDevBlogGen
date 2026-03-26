@@ -1,4 +1,4 @@
-baseURL = "https://YOURUSERNAME.github.io/AIDevBlogGen/"
+baseURL = "https://frankyfzhou.github.io/AIDevBlogGen/"
 languageCode = "en-us"
 title = "AI Dev Weekly"
 theme = "PaperMod"
@@ -27,7 +27,7 @@ buildDrafts = false
 
 [[params.socialIcons]]
   name = "github"
-  url = "https://github.com/YOURUSERNAME/AIDevBlogGen"
+  url = "https://github.com/frankyfzhou/AIDevBlogGen"
 
 [[params.socialIcons]]
   name = "rss"
