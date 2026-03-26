@@ -1,0 +1,54 @@
+baseURL = "https://YOURUSERNAME.github.io/AIDevBlogGen/"
+languageCode = "en-us"
+title = "AI Dev Weekly"
+theme = "PaperMod"
+paginate = 10
+
+enableRobotsTXT = true
+buildDrafts = false
+
+[params]
+  env = "production"
+  author = "AI Dev Weekly"
+  description = "Weekly insights on AI-assisted software development — tools, techniques, and trends for developers."
+  ShowReadingTime = true
+  ShowShareButtons = true
+  ShowPostNavLinks = true
+  ShowBreadCrumbs = true
+  ShowCodeCopyButtons = true
+  ShowWordCount = false
+  ShowRssButtonInSectionTermList = true
+  UseHugoToc = true
+  defaultTheme = "auto"
+
+[params.homeInfoParams]
+  Title = "AI Dev Weekly"
+  Content = "Your weekly roundup of AI-assisted software development news, tools, and techniques. Automatically generated and published every Monday."
+
+[[params.socialIcons]]
+  name = "github"
+  url = "https://github.com/YOURUSERNAME/AIDevBlogGen"
+
+[[params.socialIcons]]
+  name = "rss"
+  url = "/index.xml"
+
+[params.cover]
+  hidden = false
+  hiddenInList = false
+  hiddenInSingle = false
+
+[outputs]
+  home = ["HTML", "RSS", "JSON"]
+
+[markup]
+  [markup.highlight]
+    anchorLineNos = false
+    codeFences = true
+    guessSyntax = true
+    lineNos = false
+    style = "monokai"
+
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = false

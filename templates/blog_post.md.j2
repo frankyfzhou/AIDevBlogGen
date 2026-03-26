@@ -1,0 +1,25 @@
+---
+title: "{{ title }}"
+date: {{ date }}
+description: "{{ description }}"
+tags:
+{%- for tag in tags %}
+  - "{{ tag }}"
+{%- endfor %}
+draft: false
+ShowReadingTime: true
+ShowShareButtons: true
+ShowPostNavLinks: true
+---
+
+{{ introduction }}
+
+{% for section in sections %}
+## {{ section.heading }}
+
+{{ section.body }}
+
+{% endfor %}
+## Looking Ahead
+
+{{ conclusion }}
