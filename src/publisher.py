@@ -6,6 +6,7 @@ import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -24,6 +25,12 @@ def _slugify(text: str) -> str:
     return text[:80].strip("-")
 
 
+def _unsplash_cover_url(keywords: str) -> str:
+    """Build a free Unsplash image URL from keywords."""
+    q = quote(keywords.strip())
+    return f"https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80"  if not q else f"https://source.unsplash.com/1200x630/?{q}"
+
+
 def render_blog_post(post: BlogPost) -> str:
     """Render a BlogPost to Hugo-compatible markdown using the Jinja2 template."""
     env = Environment(
@@ -33,15 +40,18 @@ def render_blog_post(post: BlogPost) -> str:
     template = env.get_template("blog_post.md.j2")
 
     now = datetime.now(timezone.utc)
+    cover_url = _unsplash_cover_url(getattr(post, "cover_keywords", "artificial intelligence"))
 
     return template.render(
         title=post.title,
         date=now.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
         description=post.description,
         tags=post.tags,
+        cover_image_url=cover_url,
         introduction=post.introduction,
         sections=post.sections,
         conclusion=post.conclusion,
+        sources=getattr(post, "sources", []),
     )
 
 

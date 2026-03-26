@@ -10,6 +10,11 @@ draft: false
 ShowReadingTime: true
 ShowShareButtons: true
 ShowPostNavLinks: true
+cover:
+  image: "{{ cover_image_url }}"
+  alt: "{{ title }}"
+  caption: "Photo from [Unsplash](https://unsplash.com)"
+  relative: false
 ---
 
 {{ introduction }}
@@ -23,3 +28,13 @@ ShowPostNavLinks: true
 ## Looking Ahead
 
 {{ conclusion }}
+{% if sources %}
+
+---
+
+## Sources & Further Reading
+
+{% for src in sources %}
+- [{{ src.title }}]({{ src.url }})
+{% endfor %}
+{% endif %}

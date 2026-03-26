@@ -10,6 +10,7 @@ from src.config import NewsItem
 from src.content_generator import (
     BlogPost,
     BlogSection,
+    SourceLink,
     _build_user_prompt,
     generate_blog_post,
 )
@@ -47,17 +48,22 @@ class TestBlogPostModel:
             title="Test Post",
             description="A test description",
             tags=["ai", "test"],
+            cover_keywords="ai coding",
             introduction="Intro paragraph",
             sections=[BlogSection(heading="Section 1", body="Body text")],
             conclusion="Conclusion text",
+            sources=[SourceLink(title="Example", url="https://example.com")],
         )
         assert post.title == "Test Post"
         assert len(post.sections) == 1
+        assert len(post.sources) == 1
 
     def test_empty_sections_allowed(self):
         post = BlogPost(
             title="Test", description="Desc", tags=[],
+            cover_keywords="ai",
             introduction="Intro", sections=[], conclusion="End",
+            sources=[],
         )
         assert post.sections == []
 
@@ -73,12 +79,14 @@ class TestGenerateBlogPost:
             title="AI Dev Weekly: The Rise of Coding Agents",
             description="This week's top AI development stories",
             tags=["ai-agents", "coding"],
+            cover_keywords="ai agents",
             introduction="An exciting week in AI development.",
             sections=[
                 BlogSection(heading="Coding Agents Go Mainstream", body="Details here..."),
                 BlogSection(heading="New LLM Benchmarks", body="Results show..."),
             ],
             conclusion="The future looks bright.",
+            sources=[SourceLink(title="HN Post", url="https://a.com")],
         )
 
         mock_message = MagicMock()

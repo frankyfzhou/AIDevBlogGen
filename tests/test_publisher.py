@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.content_generator import BlogPost, BlogSection
-from src.publisher import _slugify, git_commit_and_push, render_blog_post, write_post
+from src.content_generator import BlogPost, BlogSection, SourceLink
+from src.publisher import _slugify, _unsplash_cover_url, git_commit_and_push, render_blog_post, write_post
 
 
 # ── Slugify tests ────────────────────────────────────────────────────────────
@@ -36,12 +36,17 @@ class TestRenderBlogPost:
             title="AI Dev Weekly: Test Edition",
             description="A test blog post for validation",
             tags=["ai", "testing"],
+            cover_keywords="ai testing",
             introduction="Welcome to this week's edition.",
             sections=[
                 BlogSection(heading="Big AI News", body="Something happened."),
                 BlogSection(heading="Developer Tools", body="New tools released."),
             ],
             conclusion="Exciting times ahead.",
+            sources=[
+                SourceLink(title="AI News Source", url="https://example.com/ai-news"),
+                SourceLink(title="Tool Release", url="https://example.com/tools"),
+            ],
         )
 
     def test_frontmatter_present(self):
@@ -70,6 +75,29 @@ class TestRenderBlogPost:
         rendered = render_blog_post(self._make_post())
         assert "draft: false" in rendered
 
+    def test_sources_section_rendered(self):
+        rendered = render_blog_post(self._make_post())
+        assert "## Sources & Further Reading" in rendered
+        assert "[AI News Source](https://example.com/ai-news)" in rendered
+        assert "[Tool Release](https://example.com/tools)" in rendered
+
+    def test_cover_image_in_frontmatter(self):
+        rendered = render_blog_post(self._make_post())
+        assert "cover:" in rendered
+        assert "image:" in rendered
+        assert "unsplash" in rendered.lower()
+
+
+class TestUnsplashCoverUrl:
+    def test_keywords_in_url(self):
+        url = _unsplash_cover_url("robot coding")
+        assert "unsplash" in url
+        assert "robot" in url
+
+    def test_empty_keywords_fallback(self):
+        url = _unsplash_cover_url("")
+        assert "unsplash" in url
+
 
 # ── Write post tests ─────────────────────────────────────────────────────────
 
@@ -79,9 +107,11 @@ class TestWritePost:
             title="Test Post",
             description="Desc",
             tags=["test"],
+            cover_keywords="ai",
             introduction="Intro",
             sections=[BlogSection(heading="H1", body="B1")],
             conclusion="End",
+            sources=[],
         )
         with patch("src.publisher.BLOG_CONTENT_DIR", tmp_path):
             filepath = write_post(post)
@@ -95,9 +125,11 @@ class TestWritePost:
             title="AI Agents Are Here",
             description="Desc",
             tags=[],
+            cover_keywords="ai agents",
             introduction="Intro",
             sections=[],
             conclusion="End",
+            sources=[],
         )
         with patch("src.publisher.BLOG_CONTENT_DIR", tmp_path):
             filepath = write_post(post)

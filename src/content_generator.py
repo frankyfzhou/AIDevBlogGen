@@ -21,13 +21,20 @@ class BlogSection(BaseModel):
     body: str
 
 
+class SourceLink(BaseModel):
+    title: str
+    url: str
+
+
 class BlogPost(BaseModel):
     title: str
     description: str  # SEO meta description, ~150 chars
     tags: list[str]
+    cover_keywords: str  # 1-3 word Unsplash search query for the cover image
     introduction: str
     sections: list[BlogSection]
     conclusion: str
+    sources: list[SourceLink]
 
 
 # ── Prompt construction ──────────────────────────────────────────────────────
@@ -45,9 +52,13 @@ Writing guidelines:
 - For each story: explain WHAT happened, WHY it matters for developers, and HOW they can use it
 - Include concrete code snippets, tool commands, or practical examples where relevant
 - Use markdown formatting (code blocks with language tags, bold for emphasis, links)
+- IMPORTANT: Use inline hyperlinks to cite sources throughout the text, e.g. [according to OpenAI](https://openai.com/blog/...)
+- Every claim or news item MUST link back to its original source URL inline
 - Keep the total post between 1500-2500 words
 - The conclusion should synthesize themes and offer a forward-looking perspective
 - Tags should be lowercase, hyphenated, SEO-friendly (e.g. "ai-coding", "llm-tools")
+- cover_keywords: provide 1-3 words for a relevant cover photo (e.g. "artificial intelligence", "robot coding")
+- sources: list ALL referenced URLs with a short descriptive title for each
 """
 
 
@@ -80,12 +91,18 @@ Generate a complete blog post with:
 1. A catchy, specific title (not just "AI Dev Weekly" — include the key theme)
 2. An SEO meta description (~150 characters)
 3. 5-8 relevant tags
-4. An engaging introduction paragraph
-5. 3-5 well-structured sections, each covering a story or theme
-6. A conclusion with forward-looking perspective
+4. 1-3 word cover photo search keywords (e.g. "artificial intelligence")
+5. An engaging introduction paragraph
+6. 3-5 well-structured sections, each covering a story or theme
+7. A conclusion with forward-looking perspective
+8. A list of all sources referenced (title + URL for each)
 
 For sections that involve tools or APIs, include a brief code example or CLI command \
 that developers can try.
+
+IMPORTANT: Use inline markdown links throughout the body to cite sources. \
+Every news story mentioned must include at least one [link to its source](URL). \
+Additionally, collect ALL referenced URLs into the "sources" list.
 """
 
 
@@ -128,8 +145,9 @@ def generate_blog_post(news_items: list[NewsItem]) -> BlogPost:
                 json_instruction = (
                     "\n\nIMPORTANT: Respond ONLY with a valid JSON object matching this schema:\n"
                     '{"title": "string", "description": "string", "tags": ["string"], '
+                    '"cover_keywords": "string", '
                     '"introduction": "string", "sections": [{"heading": "string", "body": "string"}], '
-                    '"conclusion": "string"}\n'
+                    '"conclusion": "string", "sources": [{"title": "string", "url": "string"}]}\n'
                     "No markdown, no code fences, just raw JSON."
                 )
                 response = client.chat.completions.create(
