@@ -22,6 +22,11 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gemini-2.0-flash"))
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
 
+# Fallback LLM — used when primary provider hits rate limits or quota
+LLM_FALLBACK_API_KEY = os.getenv("LLM_FALLBACK_API_KEY", "")
+LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "")
+LLM_FALLBACK_BASE_URL = os.getenv("LLM_FALLBACK_BASE_URL", "")
+
 # ── Fetcher Settings ─────────────────────────────────────────────────────────
 MAX_STORIES = 8  # Top N stories to include in a blog post
 FETCH_TIMEOUT = 15  # Seconds per HTTP request

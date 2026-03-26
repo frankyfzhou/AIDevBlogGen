@@ -6,10 +6,14 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from openai import OpenAI, RateLimitError, BadRequestError
+from openai import OpenAI, RateLimitError, BadRequestError, AuthenticationError
 from pydantic import BaseModel
 
-from .config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, NewsItem
+from .config import (
+    LLM_API_KEY, LLM_BASE_URL, LLM_MODEL,
+    LLM_FALLBACK_API_KEY, LLM_FALLBACK_BASE_URL, LLM_FALLBACK_MODEL,
+    NewsItem,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,25 +119,20 @@ Additionally, collect ALL referenced URLs into the "sources" list.
 
 # ── Generation ───────────────────────────────────────────────────────────────
 
-def generate_blog_post(news_items: list[NewsItem]) -> BlogPost:
-    """Generate a structured blog post from ranked news items using the LLM."""
-    if not LLM_API_KEY:
-        raise RuntimeError(
-            "LLM_API_KEY is not set. Add it to your .env file or environment."
-        )
-
-    client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
-
-    logger.info("Generating blog post with %s from %d news items...", LLM_MODEL, len(news_items))
-
-    max_retries = 5
+def _try_generate(
+    client: OpenAI,
+    model: str,
+    news_items: list[NewsItem],
+    max_retries: int = 5,
+) -> BlogPost:
+    """Attempt generation with a single provider. Raises on exhaustion."""
     use_structured = True
 
     for attempt in range(max_retries):
         try:
             if use_structured:
                 response = client.beta.chat.completions.parse(
-                    model=LLM_MODEL,
+                    model=model,
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": _build_user_prompt(news_items)},
@@ -158,7 +157,7 @@ def generate_blog_post(news_items: list[NewsItem]) -> BlogPost:
                     "No markdown, no code fences, just raw JSON."
                 )
                 response = client.chat.completions.create(
-                    model=LLM_MODEL,
+                    model=model,
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT + json_instruction},
                         {"role": "user", "content": _build_user_prompt(news_items)},
@@ -181,9 +180,37 @@ def generate_blog_post(news_items: list[NewsItem]) -> BlogPost:
         except RateLimitError as exc:
             wait = 2 ** attempt * 5
             if attempt == max_retries - 1:
-                raise RuntimeError(f"Rate limit exceeded after {max_retries} retries: {exc}") from exc
+                raise
             logger.warning("Rate limited (attempt %d/%d). Waiting %ds...", attempt + 1, max_retries, wait)
             time.sleep(wait)
 
-    raise RuntimeError("Blog generation failed after all retries.")
-    return post
+    raise RuntimeError(f"Generation failed after {max_retries} retries with {model}.")
+
+
+def generate_blog_post(news_items: list[NewsItem]) -> BlogPost:
+    """Generate a structured blog post, falling back to a secondary provider if needed."""
+    if not LLM_API_KEY:
+        raise RuntimeError(
+            "LLM_API_KEY is not set. Add it to your .env file or environment."
+        )
+
+    # --- Primary provider ---
+    client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
+    logger.info("Generating blog post with %s from %d news items...", LLM_MODEL, len(news_items))
+
+    try:
+        return _try_generate(client, LLM_MODEL, news_items)
+    except (RateLimitError, RuntimeError, AuthenticationError) as primary_exc:
+        if not LLM_FALLBACK_API_KEY:
+            raise RuntimeError(
+                f"Primary LLM failed ({primary_exc}) and no fallback is configured. "
+                "Set LLM_FALLBACK_API_KEY / LLM_FALLBACK_MODEL / LLM_FALLBACK_BASE_URL."
+            ) from primary_exc
+
+        # --- Fallback provider ---
+        logger.warning(
+            "Primary LLM (%s) failed: %s — switching to fallback (%s)",
+            LLM_MODEL, primary_exc, LLM_FALLBACK_MODEL,
+        )
+        fallback_client = OpenAI(api_key=LLM_FALLBACK_API_KEY, base_url=LLM_FALLBACK_BASE_URL)
+        return _try_generate(fallback_client, LLM_FALLBACK_MODEL, news_items)
