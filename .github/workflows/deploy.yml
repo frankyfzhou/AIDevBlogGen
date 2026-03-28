@@ -6,6 +6,7 @@ on:
     paths:
       - 'blog/**'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

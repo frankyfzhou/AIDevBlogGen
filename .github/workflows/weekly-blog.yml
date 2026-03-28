@@ -39,6 +39,16 @@ jobs:
 
       - name: Commit and push new post
         uses: stefanzweifel/git-auto-commit-action@v5
+        id: auto-commit
         with:
           commit_message: "blog: add weekly AI dev post [automated]"
           file_pattern: "blog/content/posts/*.md"
+
+  deploy:
+    needs: generate
+    if: needs.generate.result == 'success'
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
