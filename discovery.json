@@ -48,7 +48,13 @@
     "anthropic",
     "claude",
     "gpt",
-    "chatgpt"
+    "chatgpt",
+    "openai codex cli",
+    "vibe coding",
+    "copilot cli",
+    "copilot plugin",
+    "ai agent memory",
+    "autoresearch"
   ],
   "rss_sources": [
     {
@@ -110,11 +116,13 @@
     "getcursor/cursor",
     "paul-gauthier/aider",
     "cline/cline",
-    "codestoryai/sidecar"
+    "codestoryai/sidecar",
+    "zanfiel/engram"
   ],
   "search_queries": [
     "AI coding assistant news this week",
     "GitHub Copilot new features update",
-    "Claude Code cursor AI tools developer"
+    "Claude Code cursor AI tools developer",
+    "vibe coding AI agent tools weekly"
   ]
 }
