@@ -15,36 +15,39 @@ Automated weekly blog generation pipeline: fetches priority AI-assisted software
                ▼                                   ▼
 ┌──────────────────────┐              ┌────────────────────────────┐
 │   News Fetcher        │              │   Content Generator        │
-│   (Python)            │─────────────▶│   (OpenAI GPT-4o-mini)     │
+│   (Python)            │─────────────▶│   (Groq / Cerebras LLM)    │
 │                       │  ranked      │                            │
-│ • HackerNews API      │  stories     │ • Summarize top stories    │
-│ • Dev.to API          │              │ • Generate blog narrative  │
-│ • RSS feeds (10+)     │              │ • Add code demos/examples  │
+│ • Reads discovery.json│  stories     │ • Summarize top stories    │
+│ • HackerNews API      │              │ • Inline source citations  │
+│ • Dev.to API          │              │ • Mermaid diagrams         │
+│ • RSS feeds (dynamic) │              │ • Code demos/examples      │
 │ • Reddit API          │              │ • Format as Hugo markdown  │
+│ • GitHub Trending     │              │ • Cover image + sources    │
 └──────────────────────┘              └─────────────┬──────────────┘
                                                     │
-                                                    ▼
-                                      ┌────────────────────────────┐
-                                      │   Publisher                 │
-                                      │                            │
-                                      │ • Write .md to blog/content│
-                                      │ • Git commit + push        │
-                                      │ • GitHub Pages auto-deploy │
-                                      └────────────────────────────┘
+               ┌────────────────────┐               ▼
+               │  Discovery System  │ ┌────────────────────────────┐
+               │  (monthly, manual) │ │   Publisher                 │
+               │                    │ │                            │
+               │ /discover-trends   │ │ • Write .md to blog/content│
+               │ prompt in VS Code  │ │ • Git commit + push        │
+               │ → discovery.json   │ │ • GitHub Pages auto-deploy │
+               └────────────────────┘ └────────────────────────────┘
 ```
 
 ## Technology Decisions
 
 | Component            | Choice            | Rationale                                                    |
 |----------------------|-------------------|--------------------------------------------------------------|
-| Blog framework       | **Hugo**          | Fastest static site generator, single binary, no runtime deps, excellent GitHub Pages support, 300+ free themes |
-| Hosting              | **GitHub Pages**  | Free, auto-deploy on push, custom domain support, HTTPS      |
-| Scripting language   | **Python 3.11+**  | Best ecosystem for RSS parsing, HTTP, text processing        |
-| LLM API             | **OpenAI (GPT-4o-mini)** | Cheapest quality option (~$0.01 per blog post), structured output support |
-| News sources         | **Multi-source**  | HackerNews API, Dev.to, RSS, Reddit — all free, no keys needed except OpenAI |
-| Automation           | **GitHub Actions** | Free for public repos (2000 min/month private), native cron scheduling |
-| Copilot integration  | **Skill + Prompt** | On-demand generation via `/generate-blog-post` in VS Code   |
+| Blog framework       | **Hugo + PaperMod** | Fastest static site generator, free theme, excellent GitHub Pages support |
+| Hosting              | **GitHub Pages**  | Free, auto-deploy on push, HTTPS                             |
+| Scripting language   | **Python 3.9+**   | Best ecosystem for RSS parsing, HTTP, text processing        |
+| LLM API             | **Groq (primary) + Cerebras (fallback)** | Both free tier, OpenAI-compatible API, auto-fallback on rate limits |
+| News sources         | **Dynamic via discovery.json** | Keywords, RSS feeds, subreddits, GitHub repos — all configurable, refreshed monthly via Copilot |
+| Automation           | **GitHub Actions** | Free for public repos, native cron, chained deploy           |
+| Copilot integration  | **Skills + Prompts** | `/generate-blog-post` for posts, `/discover-trends` for source discovery |
 | Templating           | **Jinja2**        | Clean separation of blog post structure from generation logic |
+| Blog features        | **Sources, Mermaid, cover images** | Inline citations, diagrams, Unsplash CDN covers |
 
 ## Project Structure
 
@@ -52,40 +55,40 @@ Automated weekly blog generation pipeline: fetches priority AI-assisted software
 AIDevBlogGen/
 ├── .github/
 │   ├── workflows/
-│   │   └── weekly-blog.yml              # GitHub Actions weekly cron
+│   │   ├── weekly-blog.yml              # GitHub Actions weekly cron (Friday 9AM UTC)
+│   │   └── deploy.yml                   # Hugo build + GitHub Pages deploy
 │   ├── copilot-instructions.md          # Workspace-level Copilot instructions
 │   ├── prompts/
-│   │   └── generate-blog-post.prompt.md # On-demand Copilot prompt
+│   │   ├── generate-blog-post.prompt.md # On-demand blog generation
+│   │   └── discover-trends.prompt.md    # Monthly trend discovery → discovery.json
 │   └── skills/
 │       └── blog-generator/
 │           └── SKILL.md                 # Copilot skill for generation
 ├── blog/                                # Hugo static site
 │   ├── hugo.toml                        # Hugo configuration
-│   ├── content/
-│   │   └── posts/                       # Generated blog posts land here
-│   ├── archetypes/
-│   │   └── default.md                   # Hugo archetype for posts
-│   ├── layouts/                         # Custom layout overrides (if any)
-│   ├── static/                          # Static assets (images, etc.)
-│   └── themes/                          # Git submodule for Hugo theme
+│   ├── content/posts/                   # Generated blog posts land here
+│   ├── layouts/partials/
+│   │   └── extend_head.html             # Mermaid JS support
+│   └── themes/PaperMod/                 # Git submodule
 ├── src/
 │   ├── __init__.py
-│   ├── config.py                        # Configuration, constants, source list
+│   ├── config.py                        # Configuration, reads discovery.json
 │   ├── news_fetcher.py                  # Multi-source news aggregation
-│   ├── content_generator.py             # LLM blog post generation
-│   ├── publisher.py                     # Write to Hugo + git operations
+│   ├── content_generator.py             # LLM blog post generation (with fallback)
+│   ├── publisher.py                     # Write to Hugo + git operations + cover images
 │   └── main.py                          # CLI entry point / orchestrator
 ├── templates/
-│   └── blog_post.md.j2                 # Jinja2 template for Hugo markdown
+│   └── blog_post.md.j2                  # Jinja2 template (frontmatter, sources, cover)
 ├── tests/
 │   ├── test_news_fetcher.py
 │   ├── test_content_generator.py
 │   └── test_publisher.py
-├── .env.example                         # Example environment variables
+├── discovery.json                       # Dynamic source config (updated monthly via /discover-trends)
+├── .env.example
 ├── .gitignore
 ├── requirements.txt
 ├── PLAN.md                              # This file
-├── MANUAL_STEPS.md                      # Manual setup walkthrough
+├── MANUAL_STEPS.md
 └── README.md
 ```
 
@@ -304,18 +307,61 @@ jobs:
 
 ## News Source Details
 
-| Source | API/Method | Auth Required | Rate Limits | Notes |
-|--------|-----------|---------------|-------------|-------|
-| HackerNews | REST API | No | None | Filter top 500 stories by AI keywords |
-| Dev.to | REST API | No (read) | 30 req/min | `?tag=ai&top=7` for weekly top |
-| Reddit | JSON endpoint | No (add `.json`) | ~60 req/min | r/MachineLearning, r/artificial |
-| OpenAI Blog | RSS | No | N/A | feedparser |
-| Google AI Blog | RSS | No | N/A | feedparser |
-| Anthropic Blog | RSS | No | N/A | feedparser |
-| Hugging Face Blog | RSS | No | N/A | feedparser |
-| The Verge AI | RSS | No | N/A | feedparser |
-| Ars Technica | RSS | No | N/A | feedparser, filter AI items |
-| MIT Tech Review | RSS | No | N/A | feedparser, filter AI items |
+Sources are defined in `discovery.json` (not hardcoded). The file is updated monthly
+via the `/discover-trends` Copilot prompt.
+
+| Source Type | Method | Auth | Notes |
+|-------------|--------|------|-------|
+| HackerNews | REST API | No | Filter top stories by discovery.json keywords |
+| Dev.to | REST API | No | Tags from discovery.json |
+| Reddit | JSON endpoint | No | Subreddits from discovery.json |
+| RSS feeds | feedparser | No | URLs from discovery.json |
+| GitHub repos | Releases/README | No | Tracked repos from discovery.json |
+
+---
+
+## Dynamic Discovery System
+
+### Problem
+Hardcoded keyword lists and RSS feeds go stale. New tools (Claude Code, Cursor, etc.)
+emerge; old ones fade. Static sources miss content from blogs we don't track.
+
+### Solution: `discovery.json` + `/discover-trends` prompt
+
+**`discovery.json`** — A single config file read by the pipeline at runtime:
+```json
+{
+  "updated": "2026-03-29",
+  "focus": "AI-assisted software development tools and techniques",
+  "keywords": ["github copilot", "claude code", "cursor", ...],
+  "rss_sources": [
+    {"name": "GitHub Blog", "url": "https://github.blog/feed/", "authority": 2.0}
+  ],
+  "subreddits": ["ChatGPTPro", "CodingWithAI"],
+  "github_repos": ["github/awesome-copilot", "continuedev/continue"],
+  "search_queries": ["AI coding assistant news this week"]
+}
+```
+
+**`/discover-trends`** — A Copilot prompt the user invokes monthly in VS Code:
+1. Copilot researches current AI dev tool landscape (web search, GitHub trending)
+2. Identifies top tools, their blogs/feeds, relevant subreddits and repos
+3. Generates an updated `discovery.json`
+4. Shows diff for user review before committing
+
+### Flow
+```
+Monthly:  User runs /discover-trends → Copilot updates discovery.json → git commit
+Weekly:   CI reads discovery.json → fetches news → generates blog → deploys
+```
+
+### Why not automate discovery in CI?
+- Would require a paid search API (Tavily, etc.)
+- Copilot is already included in the user's subscription — free
+- Human review ensures quality and focus
+- Future upgrade path: add Tavily key and automate Phase 0
+
+---
 
 ## Cost Estimate
 
@@ -323,19 +369,26 @@ jobs:
 |------|------|
 | GitHub Pages hosting | **Free** |
 | GitHub Actions (public repo) | **Free** (unlimited minutes) |
-| GitHub Actions (private repo) | **Free** (2000 min/month) |
-| OpenAI GPT-4o-mini per post | **~$0.01-0.03** (~2K input + 2K output tokens) |
+| Groq LLM (primary) | **Free** (100K tokens/day) |
+| Cerebras LLM (fallback) | **Free** (1M tokens/day) |
 | Hugo + PaperMod theme | **Free** |
+| Copilot (for /discover-trends) | **Included** in existing subscription |
 | Domain (optional) | Free with `.github.io` or ~$10/year for custom |
-| **Total per month** | **< $0.15** (4 posts/month) |
+| **Total per month** | **$0** |
 
 ---
 
 ## Open Questions / Future Enhancements
 
-- [ ] Add image generation (DALL-E or free alternatives) for post thumbnails
+- [x] ~~Add image generation for post thumbnails~~ → Using Unsplash CDN cover images
+- [x] ~~Track which stories have been covered~~ → Dynamic timeframe from last post date
+- [x] ~~Fallback LLM provider~~ → Cerebras auto-fallback when Groq hits limits
+- [x] ~~Source citations~~ → Inline links + Sources & Further Reading section
+- [x] ~~Mermaid diagrams~~ → JS loaded on demand, LLM prompted to include them
+- [x] ~~Deploy not triggering~~ → Weekly workflow chains deploy via workflow_call
+- [ ] Add Tavily search API for fully automated dynamic discovery (free tier: 1000/month)
 - [ ] Add newsletter integration (Buttondown — free tier, or RSS-to-email)
 - [ ] Cross-post to Dev.to and Medium via their APIs
-- [ ] Add a review step: generate as draft, send notification, publish after approval
-- [ ] Track which stories have been covered to avoid repetition (SQLite or JSON ledger)
+- [ ] Add a draft review step: generate as draft, send notification, publish after approval
 - [ ] Add social media posting (Twitter/X, LinkedIn) via their APIs
+- [ ] YouTube/podcast transcript summarization for video-based AI dev content

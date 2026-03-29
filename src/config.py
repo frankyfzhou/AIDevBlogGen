@@ -1,6 +1,8 @@
 """Configuration constants and news source definitions."""
 from __future__ import annotations
 
+import json
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -10,11 +12,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 # ── Paths ────────────────────────────────────────────────────────────────────
 ROOT_DIR = Path(__file__).resolve().parent.parent
 BLOG_CONTENT_DIR = ROOT_DIR / "blog" / "content" / "posts"
 TEMPLATE_DIR = ROOT_DIR / "templates"
 CACHE_DIR = ROOT_DIR / ".cache"
+DISCOVERY_FILE = ROOT_DIR / "discovery.json"
 
 # ── LLM Configuration ────────────────────────────────────────────────────────
 # Supports OpenAI or any OpenAI-compatible API (e.g. Google Gemini)
@@ -34,17 +39,11 @@ CACHE_TTL_HOURS = 6
 HN_TOP_STORIES_LIMIT = 80  # How many HN stories to scan
 
 # ── AI-relevance keywords (case-insensitive matching) ────────────────────────
-AI_KEYWORDS: list[str] = [
-    "ai", "artificial intelligence", "machine learning", "deep learning",
-    "llm", "large language model", "gpt", "chatgpt", "openai", "anthropic",
-    "claude", "gemini", "copilot", "github copilot", "coding assistant",
-    "code generation", "agent", "ai agent", "agentic", "rag",
-    "retrieval augmented", "fine-tuning", "fine tuning", "transformer",
-    "diffusion", "stable diffusion", "midjourney", "dall-e",
-    "neural network", "nlp", "natural language", "computer vision",
-    "hugging face", "langchain", "vector database", "embedding",
-    "prompt engineering", "ai safety", "alignment", "rlhf",
-    "developer tools", "devtools", "ide", "vscode",
+# Fallback keywords — used only if discovery.json is missing
+_FALLBACK_KEYWORDS: list[str] = [
+    "ai", "llm", "copilot", "github copilot", "claude code", "cursor",
+    "ai coding assistant", "code generation", "ai agent", "agentic",
+    "model context protocol", "mcp", "prompt engineering", "vscode",
 ]
 
 # ── News Sources ─────────────────────────────────────────────────────────────
@@ -56,20 +55,47 @@ class RSSSource:
     authority_score: float = 1.0  # Higher = more authoritative
 
 
-RSS_SOURCES: list[RSSSource] = [
+# Fallback sources — used only if discovery.json is missing
+_FALLBACK_RSS: list[RSSSource] = [
+    RSSSource("GitHub Blog", "https://github.blog/feed/", authority_score=2.0),
     RSSSource("OpenAI Blog", "https://openai.com/blog/rss.xml", authority_score=2.0),
-    RSSSource("Google AI Blog", "https://blog.google/technology/ai/rss/", authority_score=2.0),
     RSSSource("Anthropic", "https://www.anthropic.com/rss.xml", authority_score=2.0),
-    RSSSource("Hugging Face Blog", "https://huggingface.co/blog/feed.xml", authority_score=1.5),
-    RSSSource("Microsoft Research", "https://www.microsoft.com/en-us/research/feed/", authority_score=1.5),
-    RSSSource("The Verge AI", "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", authority_score=1.0),
-    RSSSource("Ars Technica", "https://feeds.arstechnica.com/arstechnica/technology-lab", authority_score=1.0),
-    RSSSource("MIT Technology Review", "https://www.technologyreview.com/feed/", authority_score=1.5),
 ]
+
+_FALLBACK_SUBREDDITS: list[str] = ["ChatGPTCoding", "GithubCopilot"]
+
+
+def _load_discovery() -> dict:
+    """Load discovery.json or return empty dict."""
+    if DISCOVERY_FILE.exists():
+        try:
+            data = json.loads(DISCOVERY_FILE.read_text(encoding="utf-8"))
+            logger.info("Loaded discovery.json (updated: %s)", data.get("updated", "unknown"))
+            return data
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Failed to read discovery.json, using fallbacks: %s", exc)
+    else:
+        logger.info("No discovery.json found, using fallback config")
+    return {}
+
+
+_discovery = _load_discovery()
+
+AI_KEYWORDS: list[str] = _discovery.get("keywords", _FALLBACK_KEYWORDS)
+
+RSS_SOURCES: list[RSSSource] = [
+    RSSSource(s["name"], s["url"], authority_score=s.get("authority", 1.0))
+    for s in _discovery.get("rss_sources", [])
+] or _FALLBACK_RSS
+
+REDDIT_SUBREDDITS: list[str] = _discovery.get("subreddits", _FALLBACK_SUBREDDITS)
+
+GITHUB_REPOS: list[str] = _discovery.get("github_repos", [])
+
+SEARCH_QUERIES: list[str] = _discovery.get("search_queries", [])
 
 DEVTO_API_URL = "https://dev.to/api/articles"
 HN_API_BASE = "https://hacker-news.firebaseio.com/v0"
-REDDIT_SUBREDDITS: list[str] = ["MachineLearning", "artificial"]
 
 # ── HTTP ─────────────────────────────────────────────────────────────────────
 HTTP_USER_AGENT = "AIDevBlogGen/1.0 (weekly blog generator; +https://github.com/AIDevBlogGen)"

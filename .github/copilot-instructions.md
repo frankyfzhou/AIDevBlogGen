@@ -7,10 +7,11 @@ This repository is an automated weekly blog generator focused on AI-assisted sof
 ## Architecture
 
 - **`src/`** — Python pipeline: `config.py` → `news_fetcher.py` → `content_generator.py` → `publisher.py` → `main.py`
+- **`discovery.json`** — Dynamic source config (keywords, RSS feeds, subreddits, GitHub repos). Updated monthly via `/discover-trends` prompt. Read by `config.py` at runtime; hardcoded fallbacks used if missing.
 - **`blog/`** — Hugo static site with PaperMod theme
 - **`templates/`** — Jinja2 templates for Hugo markdown rendering
 - **`tests/`** — pytest test suite with mocked external calls
-- **`.github/workflows/`** — GitHub Actions for weekly generation and Hugo deploy
+- **`.github/workflows/`** — GitHub Actions for weekly generation (Friday) and Hugo deploy
 
 ## Code Conventions
 
@@ -30,6 +31,6 @@ This repository is an automated weekly blog generator focused on AI-assisted sof
 ## When Editing
 
 - Never commit API keys or secrets
-- When modifying news sources, update both `src/config.py` and the test mocks in `tests/`
+- When modifying news sources, update `discovery.json` (primary source config). Hardcoded fallbacks live in `src/config.py`. Update test mocks in `tests/` as needed.
 - Blog post template changes go in `templates/blog_post.md.j2`
 - Hugo config changes go in `blog/hugo.toml`

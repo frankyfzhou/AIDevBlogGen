@@ -1,0 +1,120 @@
+{
+  "updated": "2026-03-29",
+  "focus": "AI-assisted software development tools, techniques, and workflows for developers",
+  "keywords": [
+    "github copilot",
+    "copilot chat",
+    "copilot agent",
+    "copilot workspace",
+    "copilot instructions",
+    "copilot skills",
+    "claude code",
+    "cursor",
+    "windsurf",
+    "cline",
+    "aider",
+    "continue dev",
+    "tabnine",
+    "codeium",
+    "sourcegraph cody",
+    "amazon q developer",
+    "gemini code assist",
+    "devin",
+    "codex",
+    "ai coding assistant",
+    "ai pair programming",
+    "ai code review",
+    "ai code generation",
+    "ai autocomplete",
+    "ai refactoring",
+    "ai terminal",
+    "ai agent",
+    "agentic coding",
+    "agentic workflow",
+    "model context protocol",
+    "mcp server",
+    "llm",
+    "large language model",
+    "prompt engineering",
+    "vscode",
+    "ide",
+    "developer tools",
+    "devtools",
+    "swe-bench",
+    "ai safety",
+    "rag",
+    "retrieval augmented generation",
+    "openai",
+    "anthropic",
+    "claude",
+    "gpt",
+    "chatgpt"
+  ],
+  "rss_sources": [
+    {
+      "name": "GitHub Blog",
+      "url": "https://github.blog/feed/",
+      "authority": 2.0
+    },
+    {
+      "name": "GitHub Changelog",
+      "url": "https://github.blog/changelog/feed/",
+      "authority": 2.0
+    },
+    {
+      "name": "OpenAI Blog",
+      "url": "https://openai.com/blog/rss.xml",
+      "authority": 2.0
+    },
+    {
+      "name": "Anthropic Blog",
+      "url": "https://www.anthropic.com/rss.xml",
+      "authority": 2.0
+    },
+    {
+      "name": "Google AI Blog",
+      "url": "https://blog.google/technology/ai/rss/",
+      "authority": 1.5
+    },
+    {
+      "name": "VS Code Blog",
+      "url": "https://code.visualstudio.com/feed.xml",
+      "authority": 1.5
+    },
+    {
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "authority": 1.5
+    },
+    {
+      "name": "Simon Willison",
+      "url": "https://simonwillison.net/atom/everything/",
+      "authority": 1.5
+    },
+    {
+      "name": "Cursor Blog",
+      "url": "https://www.cursor.com/blog/rss.xml",
+      "authority": 1.5
+    }
+  ],
+  "subreddits": [
+    "ChatGPTCoding",
+    "CursorAI",
+    "GithubCopilot",
+    "ClaudeAI",
+    "LocalLLaMA"
+  ],
+  "github_repos": [
+    "github/awesome-copilot",
+    "continuedev/continue",
+    "getcursor/cursor",
+    "paul-gauthier/aider",
+    "cline/cline",
+    "codestoryai/sidecar"
+  ],
+  "search_queries": [
+    "AI coding assistant news this week",
+    "GitHub Copilot new features update",
+    "Claude Code cursor AI tools developer"
+  ]
+}
