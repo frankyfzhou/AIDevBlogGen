@@ -172,6 +172,7 @@ class TestFetchReddit:
                 "children": [
                     {
                         "data": {
+                            "id": "abc123",
                             "title": "GPT-5 released with amazing coding ability",
                             "url": "https://openai.com/gpt5",
                             "permalink": "/r/MachineLearning/comments/abc/",
@@ -186,6 +187,33 @@ class TestFetchReddit:
         items = fetch_reddit()
         assert len(items) >= 1
         assert "reddit" in items[0].tags
+
+    @patch("src.news_fetcher._read_cache", return_value=None)
+    @patch("src.news_fetcher._write_cache")
+    @patch("src.news_fetcher._get_json")
+    def test_deduplicates_across_endpoints(self, mock_get, mock_write, mock_read):
+        """Same post appearing in both /top and /hot should only appear once."""
+        mock_get.return_value = {
+            "data": {
+                "children": [
+                    {
+                        "data": {
+                            "id": "same_post",
+                            "title": "Claude Code source leaked",
+                            "url": "https://reddit.com/r/ClaudeAI/comments/xyz/",
+                            "permalink": "/r/ClaudeAI/comments/xyz/",
+                            "selftext": "The source code for Claude Code was leaked",
+                            "created_utc": 1711324800,
+                            "ups": 2000,
+                        }
+                    },
+                ]
+            }
+        }
+        items = fetch_reddit()
+        # Same id returned from both /top and /hot — should be deduped
+        titles = [i.title for i in items]
+        assert titles.count("Claude Code source leaked") == 1
 
 
 # ── RSS fetcher tests ───────────────────────────────────────────────────────

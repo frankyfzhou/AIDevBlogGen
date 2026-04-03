@@ -211,38 +211,48 @@ def fetch_devto() -> list[NewsItem]:
 
 
 def fetch_reddit() -> list[NewsItem]:
-    """Fetch top weekly posts from AI-related subreddits."""
+    """Fetch top weekly + hot posts from AI-related subreddits."""
     cached = _read_cache("reddit")
     if cached is not None:
         return [NewsItem(**item) for item in cached]
 
     items: list[NewsItem] = []
+    seen_ids: set[str] = set()
     for sub in REDDIT_SUBREDDITS:
-        url = f"https://www.reddit.com/r/{sub}/top/.json?t=week&limit=20"
-        data = _get_json(url)
-        if not data or "data" not in data:
-            continue
-        for child in data["data"].get("children", []):
-            post = child.get("data", {})
-            title = post.get("title", "")
-            if not _is_ai_relevant(title, post.get("selftext", "")[:300]):
+        # Fetch both top/week (established stories) and hot (breaking news)
+        endpoints = [
+            f"https://www.reddit.com/r/{sub}/top/.json?t=week&limit=20",
+            f"https://www.reddit.com/r/{sub}/hot/.json?limit=15",
+        ]
+        for url in endpoints:
+            data = _get_json(url)
+            if not data or "data" not in data:
                 continue
-            ts = post.get("created_utc")
-            pub_date = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else None
-            ups = post.get("ups", 0)
-            post_url = post.get("url", "")
-            # Prefer external link; fall back to reddit permalink
-            if post_url.startswith("/r/") or not post_url.startswith("http"):
-                post_url = f"https://www.reddit.com{post.get('permalink', '')}"
-            items.append(NewsItem(
-                title=title,
-                url=post_url,
-                source=f"Reddit r/{sub}",
-                summary=post.get("selftext", "")[:300],
-                published_date=pub_date,
-                score=ups / 1000.0,
-                tags=["reddit", sub.lower()],
-            ))
+            for child in data["data"].get("children", []):
+                post = child.get("data", {})
+                post_id = post.get("id", "")
+                if post_id in seen_ids:
+                    continue
+                seen_ids.add(post_id)
+                title = post.get("title", "")
+                if not _is_ai_relevant(title, post.get("selftext", "")[:300]):
+                    continue
+                ts = post.get("created_utc")
+                pub_date = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else None
+                ups = post.get("ups", 0)
+                post_url = post.get("url", "")
+                # Prefer external link; fall back to reddit permalink
+                if post_url.startswith("/r/") or not post_url.startswith("http"):
+                    post_url = f"https://www.reddit.com{post.get('permalink', '')}"
+                items.append(NewsItem(
+                    title=title,
+                    url=post_url,
+                    source=f"Reddit r/{sub}",
+                    summary=post.get("selftext", "")[:300],
+                    published_date=pub_date,
+                    score=ups / 1000.0,
+                    tags=["reddit", sub.lower()],
+                ))
 
     _write_cache("reddit", [_item_to_dict(i) for i in items])
     logger.info("Reddit: fetched %d AI posts", len(items))
@@ -340,13 +350,28 @@ def _deduplicate(items: list[NewsItem]) -> list[NewsItem]:
 
 
 def _compute_final_score(item: NewsItem) -> float:
-    """Compute a weighted final score for ranking."""
+    """Compute a weighted final score for ranking.
+
+    Uses keyword relevance, recency, engagement, and velocity (engagement/age)
+    to surface breaking stories that are gaining traction fast.
+    """
     kw = _keyword_score(f"{item.title} {item.summary}")
     recency = _recency_score(item.published_date)
     engagement = min(item.score, 1.0)  # Already normalized per-source
 
-    # Weighted combination
-    return (kw * 0.35) + (recency * 0.30) + (engagement * 0.35)
+    # Velocity: upvotes per hour, capped at 1.0
+    # A post with 500 ups in 2 hours → 250 ups/hr → velocity 1.0
+    velocity = 0.0
+    if item.published_date is not None:
+        dt = item.published_date
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        age_hours = max((datetime.now(timezone.utc) - dt).total_seconds() / 3600, 1.0)
+        raw_engagement = item.score * 1000.0  # Reverse the /1000 normalization for Reddit
+        velocity = min(raw_engagement / age_hours / 250.0, 1.0)
+
+    # Weighted combination: velocity helps breaking stories compete
+    return (kw * 0.30) + (recency * 0.25) + (engagement * 0.25) + (velocity * 0.20)
 
 
 def _get_cutoff_date() -> datetime:
