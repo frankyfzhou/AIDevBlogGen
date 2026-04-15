@@ -73,7 +73,7 @@ cd blog && hugo server -D
 │   └── main.py             CLI orchestrator
 ├── blog/                   Hugo static site (PaperMod theme)
 ├── templates/              Jinja2 blog post template
-├── tests/                  pytest test suite (79 tests)
+├── tests/                  pytest test suite (100 tests)
 ├── discovery.json          Dynamic source config (updated monthly)
 ├── .github/workflows/      GitHub Actions (weekly cron + deploy)
 └── .github/skills/         Copilot skill for on-demand generation
@@ -97,7 +97,6 @@ cd blog && hugo server -D
 ## License
 
 MIT
-# AIDevBlogGen
 
 Automated weekly blog generator for AI-assisted software development news. Fetches from 10+ sources, generates polished posts with GPT-4o-mini, and publishes to GitHub Pages via Hugo.
 

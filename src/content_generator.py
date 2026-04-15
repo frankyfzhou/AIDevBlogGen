@@ -370,6 +370,10 @@ This spotlight section should be 800-1200 words. The news sections should be bri
         try:
             data = json.loads(_extract_json(raw))
             post = BlogPost(**data)
+            if not post.sections:
+                raise ValueError("Generated post has no sections")
+            if not post.introduction.strip():
+                raise ValueError("Generated post has empty introduction")
             post = _validate_blog_urls(post, news_items, spotlight)
             logger.info("Generated post: %s (%d sections, %d sources)", post.title, len(post.sections), len(post.sources))
             return post

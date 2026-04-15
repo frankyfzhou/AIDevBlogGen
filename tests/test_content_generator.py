@@ -194,10 +194,57 @@ class TestGenerateBlogPost:
         result = generate_blog_post(items)
         assert result.title == "AI Dev Weekly: The Rise of Coding Agents"
 
+    @patch("src.content_generator.call_llm")
+    def test_with_spotlight_uses_heavy_model(self, mock_call):
+        """When spotlight is provided, the heavy model is used and addendum is in system prompt."""
+        mock_call.return_value = MOCK_BLOG_JSON
+        items = [
+            NewsItem("Story", "https://a.com", "HN", "Summary",
+                     datetime.now(timezone.utc), 0.5, []),
+        ]
+        spotlight = MagicMock()
+        spotlight.tool = "GitHub Copilot"
+        spotlight.feature = "Agent Mode"
+        spotlight.source_url = "https://docs.github.com/copilot"
+        spotlight.justification = "New feature"
+        spotlight.source_content = "Agent mode allows autonomous coding."
+        result = generate_blog_post(items, spotlight=spotlight)
+        assert result.title == "AI Dev Weekly: The Rise of Coding Agents"
+        # Verify heavy model was used
+        call_kwargs = mock_call.call_args[1]
+        from src.config import LLM_MODEL_HEAVY
+        assert call_kwargs["model"] == LLM_MODEL_HEAVY
+        # Verify spotlight addendum was included in system message
+        assert "Feature Spotlight" in call_kwargs["system_message"]
 
-# ── _get_github_token tests ─────────────────────────────────────────────────
+    @patch("src.content_generator.call_llm")
+    def test_rejects_empty_sections(self, mock_call):
+        """Posts with no sections are rejected and retried."""
+        empty_post = json.dumps({
+            "title": "Empty", "description": "d", "tags": [],
+            "cover_keywords": "ai", "introduction": "Intro",
+            "sections": [], "conclusion": "End", "sources": [],
+        })
+        mock_call.side_effect = [empty_post, MOCK_BLOG_JSON]
+        items = [NewsItem("Story", "https://a.com", "HN", "", datetime.now(timezone.utc), 0.5, [])]
+        result = generate_blog_post(items)
+        assert len(result.sections) == 2
+        assert mock_call.call_count == 2
 
-class TestGetGithubToken:
+    @patch("src.content_generator.call_llm")
+    def test_rejects_empty_introduction(self, mock_call):
+        """Posts with empty introduction are rejected and retried."""
+        bad_post = json.dumps({
+            "title": "Bad", "description": "d", "tags": [],
+            "cover_keywords": "ai", "introduction": "  ",
+            "sections": [{"heading": "H", "body": "B"}],
+            "conclusion": "End", "sources": [],
+        })
+        mock_call.side_effect = [bad_post, MOCK_BLOG_JSON]
+        items = [NewsItem("Story", "https://a.com", "HN", "", datetime.now(timezone.utc), 0.5, [])]
+        result = generate_blog_post(items)
+        assert result.introduction.strip() != ""
+        assert mock_call.call_count == 2
     @patch.dict("os.environ", {"GITHUB_TOKEN": "gho_test123"})
     def test_reads_from_env(self):
         from src.content_generator import _get_github_token

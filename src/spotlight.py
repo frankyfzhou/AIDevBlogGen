@@ -62,6 +62,9 @@ def discover_tools() -> list[ToolInfo]:
     # Validate URLs — discard tools with unreachable docs
     validated = []
     for tool in tools:
+        if not tool.docs_url.startswith(("https://", "http://")):
+            logger.warning("Rejected tool %s: invalid URL scheme: %s", tool.name, tool.docs_url)
+            continue
         try:
             resp = requests.get(tool.docs_url, timeout=FETCH_TIMEOUT, allow_redirects=True)
             if resp.status_code < 400:
@@ -225,7 +228,10 @@ def select_spotlight_topic(
             prompt += "\n\nYour previous answer used an invalid URL. Pick a source_url ONLY from the list above."
             continue
 
-        # Validate the source URL and fetch content for the generation prompt
+        # Validate URL scheme and fetch content for the generation prompt
+        if not topic.source_url.startswith(("https://", "http://")):
+            logger.warning("Spotlight source URL has invalid scheme (attempt %d): %s", attempt + 1, topic.source_url)
+            continue
         try:
             resp = requests.get(topic.source_url, timeout=FETCH_TIMEOUT, allow_redirects=True)
             if resp.status_code >= 400:

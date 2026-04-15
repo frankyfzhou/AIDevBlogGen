@@ -121,6 +121,15 @@ class TestDiscoverTools:
         assert len(tools) == 1
         assert tools[0].name == "GitHub Copilot"
 
+    @patch("src.spotlight.call_llm")
+    def test_rejects_invalid_url_scheme(self, mock_llm):
+        """Tools with non-HTTP(S) URLs are rejected without fetching."""
+        mock_llm.return_value = json.dumps({"tools": [
+            {"name": "Bad", "docs_url": "file:///etc/passwd", "changelog_url": "ftp://x.com", "rss_url": None},
+        ]})
+        tools = discover_tools()
+        assert tools == []
+
     @patch("src.spotlight.call_llm", return_value="not json")
     def test_returns_empty_on_parse_error(self, mock_llm):
         tools = discover_tools()
