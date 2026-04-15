@@ -23,7 +23,10 @@ DISCOVERY_FILE = ROOT_DIR / "discovery.json"
 
 # ── LLM Configuration ────────────────────────────────────────────────────────
 # Uses GitHub Copilot SDK — model configurable, auth via GITHUB_TOKEN or gh keyring
-LLM_MODEL = os.getenv("LLM_MODEL", "claude-opus-4.6")
+# LLM_MODEL: cheap model for tool discovery, topic selection, news-only posts
+# LLM_MODEL_HEAVY: premium model used ONLY for blog generation with a Feature Spotlight
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4.1")
+LLM_MODEL_HEAVY = os.getenv("LLM_MODEL_HEAVY", "claude-opus-4.6")
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "300"))  # seconds per LLM call
 
 # ── Fetcher Settings ─────────────────────────────────────────────────────────

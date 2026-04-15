@@ -10,12 +10,50 @@ from src.config import NewsItem
 from src.spotlight import (
     ToolInfo,
     SpotlightTopic,
+    _html_to_text,
+    _extract_urls,
     discover_tools,
     fetch_changelogs,
     select_spotlight_topic,
     should_skip_spotlight,
     discover_spotlight,
 )
+
+
+# ── _html_to_text ────────────────────────────────────────────────────────────
+
+class TestHtmlToText:
+    def test_strips_tags(self):
+        assert _html_to_text("<p>Hello <b>world</b></p>") == "Hello world"
+
+    def test_strips_scripts_and_styles(self):
+        html = "<style>body{}</style><script>alert(1)</script><div>Content</div>"
+        assert _html_to_text(html) == "Content"
+
+    def test_collapses_whitespace(self):
+        assert _html_to_text("<p>a</p>  <p>b</p>") == "a b"
+
+    def test_plain_text_passthrough(self):
+        assert _html_to_text("just plain text") == "just plain text"
+
+
+# ── _extract_urls ────────────────────────────────────────────────────────────
+
+class TestExtractUrls:
+    def test_extracts_absolute_urls(self):
+        html = '<a href="https://example.com/a">A</a><a href="https://example.com/b">B</a>'
+        urls = _extract_urls(html, "https://example.com")
+        assert urls == ["https://example.com/a", "https://example.com/b"]
+
+    def test_resolves_relative_urls(self):
+        html = '<a href="/changelog/feature-x">X</a>'
+        urls = _extract_urls(html, "https://github.blog/changelog/")
+        assert urls == ["https://github.blog/changelog/feature-x"]
+
+    def test_deduplicates(self):
+        html = '<a href="https://a.com/x">1</a><a href="https://a.com/x">2</a>'
+        urls = _extract_urls(html, "https://a.com")
+        assert len(urls) == 1
 
 
 # ── should_skip_spotlight ────────────────────────────────────────────────────
@@ -93,20 +131,24 @@ class TestDiscoverTools:
 
 class TestFetchChangelogs:
     @patch("src.spotlight.requests.get")
-    def test_fetches_changelog_text(self, mock_get):
-        mock_get.return_value = MagicMock(status_code=200, text="New feature: X\nBug fix: Y")
+    def test_fetches_changelog_text_and_urls(self, mock_get):
+        html = '<h1>Changelog</h1><p>New feature: X</p><a href="https://a.com/feature-x">Details</a>'
+        mock_get.return_value = MagicMock(status_code=200, text=html)
         tools = [ToolInfo(name="TestTool", docs_url="https://a.com", changelog_url="https://a.com/changelog")]
-        result = fetch_changelogs(tools)
-        assert "TestTool" in result
-        assert "New feature" in result["TestTool"]
+        changelogs, changelog_urls = fetch_changelogs(tools)
+        assert "TestTool" in changelogs
+        assert "New feature" in changelogs["TestTool"]
+        assert "<p>" not in changelogs["TestTool"]
+        assert "https://a.com/feature-x" in changelog_urls["TestTool"]
 
     @patch("src.spotlight.requests.get")
     def test_skips_on_error(self, mock_get):
         from requests import RequestException
         mock_get.side_effect = RequestException("timeout")
         tools = [ToolInfo(name="TestTool", docs_url="https://a.com", changelog_url="https://a.com/changelog")]
-        result = fetch_changelogs(tools)
-        assert result == {}
+        changelogs, changelog_urls = fetch_changelogs(tools)
+        assert changelogs == {}
+        assert changelog_urls == {}
 
 
 # ── select_spotlight_topic ───────────────────────────────────────────────────
@@ -123,11 +165,21 @@ class TestSelectSpotlightTopic:
     @patch("src.spotlight.requests.get")
     @patch("src.spotlight.call_llm", return_value=MOCK_TOPIC_JSON)
     def test_returns_validated_topic(self, mock_llm, mock_get):
-        mock_get.return_value = MagicMock(status_code=200)
-        topic = select_spotlight_topic({"GitHub Copilot": "changelog text..."})
+        mock_get.return_value = MagicMock(status_code=200, text="<h1>Agent Mode</h1><p>Details here</p>")
+        urls = {"GitHub Copilot": ["https://github.blog/changelog/agent-mode"]}
+        topic = select_spotlight_topic({"GitHub Copilot": "changelog text..."}, urls)
         assert topic is not None
         assert topic.tool == "GitHub Copilot"
         assert topic.feature == "Agent mode with custom tools"
+        assert "Agent Mode" in topic.source_content
+        assert "<h1>" not in topic.source_content
+
+    @patch("src.spotlight.requests.get")
+    @patch("src.spotlight.call_llm", return_value=MOCK_TOPIC_JSON)
+    def test_rejects_url_not_in_allowed_list(self, mock_llm, mock_get):
+        urls = {"GitHub Copilot": ["https://github.blog/changelog/other-feature"]}
+        topic = select_spotlight_topic({"GitHub Copilot": "changelog..."}, urls)
+        assert topic is None
 
     @patch("src.spotlight.requests.get")
     @patch("src.spotlight.call_llm", return_value=MOCK_TOPIC_JSON)
@@ -156,10 +208,13 @@ class TestDiscoverSpotlight:
         mock_tools.return_value = [
             ToolInfo(name="Copilot", docs_url="https://d.com", changelog_url="https://c.com"),
         ]
-        mock_changelogs.return_value = {"Copilot": "new stuff"}
+        mock_changelogs.return_value = (
+            {"Copilot": "new stuff"},
+            {"Copilot": ["https://c.com/feature-1"]},
+        )
         mock_topic.return_value = SpotlightTopic(
             tool="Copilot", feature="Custom agents",
-            source_url="https://x.com", justification="New",
+            source_url="https://c.com/feature-1", justification="New",
         )
         item = MagicMock(score=0.5)
         result = discover_spotlight([item])

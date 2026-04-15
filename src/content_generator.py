@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel
 
-from .config import LLM_MODEL, LLM_TIMEOUT, ROOT_DIR, NewsItem
+from .config import LLM_MODEL, LLM_MODEL_HEAVY, LLM_TIMEOUT, ROOT_DIR, NewsItem
 
 logger = logging.getLogger(__name__)
 
@@ -217,14 +217,16 @@ Additionally, collect ALL referenced URLs into the "sources" list.
 SPOTLIGHT_SYSTEM_ADDENDUM = """
 When a Feature Spotlight topic is provided, include a dedicated "Feature Spotlight" \
 section covering:
-- What the feature is and why it matters for day-to-day development
-- Real, working code/config examples (not toy demos)
-- Gotchas, edge cases, and non-obvious behavior
+- What the feature is and why it matters for day-to-day development workflows
+- Real CLI commands, config snippets, or code that a senior engineer would actually run
+- Gotchas, edge cases, and non-obvious behavior you know from the docs
 - How it composes with other features of the same tool
-- Cite the source docs/changelog inline
+- Cite the source docs/changelog inline with markdown links
 
 Target audience: senior engineers who already use the tool daily.
-Skip basics. Go straight to practical depth. 800-1200 words for the spotlight section.
+Skip basics and marketing fluff. Go straight to practical depth.
+Do NOT invent features — only write about what is documented in the provided source content.
+800-1200 words for the spotlight section.
 
 The final JSON should include the spotlight as one of the sections (with a heading \
 like "Feature Spotlight: [Feature Name]").
@@ -244,7 +246,9 @@ def generate_blog_post(
     If spotlight is provided (SpotlightTopic), the post includes a
     Feature Spotlight deep-dive section.
     """
-    logger.info("Generating blog post with %s from %d news items...", LLM_MODEL, len(news_items))
+    # Use heavy model when spotlight is present, cheap model for news-only
+    active_model = LLM_MODEL_HEAVY if spotlight else LLM_MODEL
+    logger.info("Generating blog post with %s from %d news items...", active_model, len(news_items))
 
     system = SYSTEM_PROMPT
     if spotlight:
@@ -253,6 +257,16 @@ def generate_blog_post(
     prompt = _build_user_prompt(news_items)
 
     if spotlight:
+        source_docs = getattr(spotlight, 'source_content', '') or ''
+        source_section = ""
+        if source_docs:
+            source_section = f"""
+
+Here is the ACTUAL content from the source page — use this as your primary reference:
+---
+{source_docs}
+---"""
+
         prompt += f"""
 
 === FEATURE SPOTLIGHT ===
@@ -261,8 +275,12 @@ Include a Feature Spotlight section on this topic:
 - Feature: {spotlight.feature}
 - Source URL: {spotlight.source_url}
 - Why: {spotlight.justification}
+{source_section}
 
-Write an accurate, detailed deep-dive based on the source docs.
+IMPORTANT: Base the spotlight ONLY on the source content provided above and your \
+knowledge of this tool. Do NOT invent features or capabilities that aren't documented. \
+Focus on practical developer workflow impact — real commands, config, and code that \
+senior engineers would actually use.
 This spotlight section should be 800-1200 words. The news sections should be briefer \
 (2-3 stories, ~400-500 words total) to make room for the spotlight.
 """
@@ -270,6 +288,7 @@ This spotlight section should be 800-1200 words. The news sections should be bri
     for attempt in range(2):
         raw = call_llm(
             prompt=prompt,
+            model=active_model,
             system_message=system,
         )
         logger.debug("LLM raw response (first 200 chars): %s", repr(raw[:200]) if raw else "<empty>")
