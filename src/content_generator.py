@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
@@ -37,6 +38,77 @@ class BlogPost(BaseModel):
     sections: list[BlogSection]
     conclusion: str
     sources: list[SourceLink]
+
+
+# ── URL validation ───────────────────────────────────────────────────────────
+
+def _normalize_url(url: str) -> str:
+    """Normalize a URL for comparison: lowercase scheme+host, strip trailing slash."""
+    url = url.strip()
+    parsed = urlparse(url)
+    path = parsed.path.rstrip("/")
+    normalized = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{path}"
+    if parsed.query:
+        normalized += f"?{parsed.query}"
+    if parsed.fragment:
+        normalized += f"#{parsed.fragment}"
+    return normalized
+
+
+# Matches markdown links [text](url) but NOT image refs ![alt](url)
+_LINK_RE = re.compile(r'(?<!!)\[([^\]]+)\]\(([^)]+)\)')
+
+
+def _validate_blog_urls(
+    post: BlogPost,
+    news_items: list[NewsItem],
+    spotlight: object | None = None,
+) -> BlogPost:
+    """Validate all URLs in the blog post against an allowlist of input URLs.
+
+    - Removes sources whose URL is not in the allowlist.
+    - Strips inline markdown links whose URL is not in the allowlist,
+      preserving the link text.
+    """
+    allowed: set[str] = set()
+    for item in news_items:
+        allowed.add(_normalize_url(item.url))
+    if spotlight and hasattr(spotlight, "source_url") and spotlight.source_url:
+        allowed.add(_normalize_url(spotlight.source_url))
+
+    # Filter sources
+    valid_sources: list[SourceLink] = []
+    for src in post.sources:
+        if _normalize_url(src.url) in allowed:
+            valid_sources.append(src)
+        else:
+            logger.warning("Removed unverified source URL: %s", src.url)
+
+    # Sanitise inline links in text fields
+    def _sanitize(text: str) -> str:
+        def _replace(m: re.Match) -> str:
+            link_text, url = m.group(1), m.group(2)
+            if _normalize_url(url) in allowed:
+                return m.group(0)
+            logger.warning("Removed unverified inline URL: %s", url)
+            return link_text
+        return _LINK_RE.sub(_replace, text)
+
+    sanitized_sections = [
+        BlogSection(heading=s.heading, body=_sanitize(s.body))
+        for s in post.sections
+    ]
+
+    return BlogPost(
+        title=post.title,
+        description=post.description,
+        tags=post.tags,
+        cover_keywords=post.cover_keywords,
+        introduction=_sanitize(post.introduction),
+        sections=sanitized_sections,
+        conclusion=_sanitize(post.conclusion),
+        sources=valid_sources,
+    )
 
 
 # ── JSON extraction ──────────────────────────────────────────────────────────
@@ -298,7 +370,8 @@ This spotlight section should be 800-1200 words. The news sections should be bri
         try:
             data = json.loads(_extract_json(raw))
             post = BlogPost(**data)
-            logger.info("Generated post: %s (%d sections)", post.title, len(post.sections))
+            post = _validate_blog_urls(post, news_items, spotlight)
+            logger.info("Generated post: %s (%d sections, %d sources)", post.title, len(post.sections), len(post.sources))
             return post
         except (json.JSONDecodeError, ValueError) as exc:
             if attempt == 0:

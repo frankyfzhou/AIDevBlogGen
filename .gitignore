@@ -9,9 +9,9 @@ build/
 *.egg
 .eggs/
 venv/
+venv13/
 .venv/
 env/
-.env
 
 # Environment variables / secrets
 .env

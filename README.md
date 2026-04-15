@@ -1,5 +1,104 @@
 # AIDevBlogGen
 
+Automated weekly blog generator for AI-assisted software development news. Fetches from 10+ sources, generates polished posts with GitHub Copilot SDK, and publishes to GitHub Pages via Hugo.
+
+## How It Works
+
+```
+News Sources (HN, Dev.to, Reddit, RSS)
+  → Fetch & Rank
+  → Feature Spotlight Discovery (changelogs, topic selection)
+  → Blog Generation via Copilot SDK (claude-haiku-4.5 / claude-opus-4.6)
+  → Hugo Markdown
+  → GitHub Pages
+```
+
+Every Friday at 9 AM UTC, a GitHub Actions workflow:
+1. Fetches AI/dev news from HackerNews, Dev.to, Reddit, and 8+ RSS feeds
+2. Ranks stories by keyword relevance, recency, and engagement
+3. Discovers a Feature Spotlight topic from tool changelogs (if applicable)
+4. Generates a blog post via GitHub Copilot SDK
+5. Commits the post and deploys the Hugo site to GitHub Pages
+
+## Quick Start
+
+```bash
+# 1. Clone and set up
+git clone https://github.com/frankyfzhou/AIDevBlogGen.git
+cd AIDevBlogGen
+
+# 2. Install Hugo
+brew install hugo
+
+# 3. Set up Python
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 4. Add theme
+cd blog && git submodule add https://github.com/adityatelange/hugo-PaperMod themes/PaperMod && cd ..
+
+# 5. Auth (requires GitHub Copilot subscription)
+gh auth login
+
+# 6. Generate a post
+LLM_MODEL=gpt-4.1 python -m src.main --no-push --verbose
+
+# 7. Preview
+cd blog && hugo server -D
+```
+
+## Usage
+
+```bash
+# Generate locally (no git push) — use gpt-4.1 for free testing
+LLM_MODEL=gpt-4.1 python -m src.main --no-push --verbose
+
+# Run tests
+python -m pytest tests/ -v
+
+# Preview blog
+cd blog && hugo server -D
+```
+
+## Project Structure
+
+```
+├── src/                    Python pipeline
+│   ├── config.py           Configuration & news source definitions
+│   ├── news_fetcher.py     Multi-source fetcher with ranking
+│   ├── spotlight.py        Feature Spotlight discovery (changelogs → topic)
+│   ├── content_generator.py  Blog generation via Copilot SDK
+│   ├── publisher.py        Hugo file writer + git operations
+│   └── main.py             CLI orchestrator
+├── blog/                   Hugo static site (PaperMod theme)
+├── templates/              Jinja2 blog post template
+├── tests/                  pytest test suite (79 tests)
+├── discovery.json          Dynamic source config (updated monthly)
+├── .github/workflows/      GitHub Actions (weekly cron + deploy)
+└── .github/skills/         Copilot skill for on-demand generation
+```
+
+## LLM Models
+
+| Model | Usage | Premium Requests |
+|-------|-------|-----------------|
+| `claude-haiku-4.5` | Tool discovery, topic selection, news-only posts | 0 |
+| `claude-opus-4.6` | Blog generation with Feature Spotlight | 3/call |
+
+## Cost
+
+| Item | Cost |
+|------|------|
+| Hosting (GitHub Pages) | Free |
+| CI/CD (GitHub Actions) | Free |
+| LLM (GitHub Copilot SDK) | Included in Copilot subscription |
+
+## License
+
+MIT
+# AIDevBlogGen
+
 Automated weekly blog generator for AI-assisted software development news. Fetches from 10+ sources, generates polished posts with GPT-4o-mini, and publishes to GitHub Pages via Hugo.
 
 ## How It Works

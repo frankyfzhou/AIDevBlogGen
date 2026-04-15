@@ -90,10 +90,6 @@ RSS_SOURCES: list[RSSSource] = [
 
 REDDIT_SUBREDDITS: list[str] = _discovery.get("subreddits", _FALLBACK_SUBREDDITS)
 
-GITHUB_REPOS: list[str] = _discovery.get("github_repos", [])
-
-SEARCH_QUERIES: list[str] = _discovery.get("search_queries", [])
-
 DEVTO_API_URL = "https://dev.to/api/articles"
 HN_API_BASE = "https://hacker-news.firebaseio.com/v0"
 

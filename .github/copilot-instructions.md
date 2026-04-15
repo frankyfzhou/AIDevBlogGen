@@ -32,11 +32,12 @@ This repository is an automated weekly blog generator focused on AI-assisted sof
 
 ## LLM Model Usage
 
-- **Production model:** `claude-opus-4.6` (3 premium requests/call) — set as default in `config.py`
-- **Testing model:** `gpt-4.1` (0 premium requests) — use for all dev/test cycles
-- When running the pipeline locally for testing, always set `LLM_MODEL=gpt-4.1` to avoid burning premium requests
-- When opening Copilot CLI/SDK sessions for development work (not blog content), use `--model gpt-4.1`
-- Premium budget: Copilot Pro = 300/month. Claude Opus at ~15 req/run × 4 runs = ~60/month for production only
+- **Two-model system:** `LLM_MODEL` (cheap) and `LLM_MODEL_HEAVY` (premium)
+- `claude-haiku-4.5` (0 premium) — tool discovery, topic selection, news-only posts
+- `claude-opus-4.6` (3 premium/call) — blog generation with Feature Spotlight only
+- When testing locally, set both to `gpt-4.1`: `LLM_MODEL=gpt-4.1 LLM_MODEL_HEAVY=gpt-4.1`
+- For CI testing, set repo variables via `gh variable set` then delete after
+- Premium budget: ~3 per production run (only spotlight posts use heavy model)
 
 ## When Editing
 
