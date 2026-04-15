@@ -140,10 +140,11 @@ with AI tools, frameworks, and techniques that impact their daily work.
 
 Writing guidelines:
 - Tone: informative, practical, accessible — not academic or hype-driven
-- Structure: clear sections with descriptive headings
-- For each story: explain WHAT happened, WHY it matters for developers, and HOW they can use it
+- Structure: clear sections with descriptive headings (no generic subtitles like "Why It Matters" or "How to Use It")
+- For each story: cover what changed, its practical impact, and how developers can act on it — woven naturally into prose, not as labeled subsections
 - Include concrete code snippets, tool commands, or practical examples where relevant
 - Use markdown formatting (code blocks with language tags, bold for emphasis, links)
+- Do NOT use bold-text subtitles (e.g. "**What Changed?**", "**Why It Matters**") — write flowing prose instead
 - Include 1-2 Mermaid diagrams where they help explain architecture, workflows, or pipelines. \
 Use standard markdown code fences with the "mermaid" language tag, e.g.:
   ```mermaid
@@ -216,12 +217,14 @@ Additionally, collect ALL referenced URLs into the "sources" list.
 
 SPOTLIGHT_SYSTEM_ADDENDUM = """
 When a Feature Spotlight topic is provided, include a dedicated "Feature Spotlight" \
-section covering:
-- What the feature is and why it matters for day-to-day development workflows
-- Real CLI commands, config snippets, or code that a senior engineer would actually run
-- Gotchas, edge cases, and non-obvious behavior you know from the docs
-- How it composes with other features of the same tool
-- Cite the source docs/changelog inline with markdown links
+section. Write it as a cohesive technical deep-dive — NOT a list of labeled subsections. \
+Do NOT use bold-text subtitles like "**Why It Matters**" or "**Gotchas**" — instead, \
+weave these naturally into the narrative flow.
+
+The spotlight should cover the feature's practical impact on daily dev workflows, \
+include real CLI commands / config snippets / code a senior engineer would actually run, \
+discuss non-obvious behavior and edge cases inline, explain how it composes with other \
+features of the same tool, and cite the source docs/changelog with inline markdown links.
 
 Target audience: senior engineers who already use the tool daily.
 Skip basics and marketing fluff. Go straight to practical depth.
