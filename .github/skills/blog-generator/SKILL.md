@@ -15,8 +15,8 @@ End-to-end workflow for generating and publishing an AI Dev Weekly blog post.
 
 ## Prerequisites
 
-- Python virtual environment activated with dependencies installed
-- LLM API keys set in `.env` (Groq primary, Cerebras fallback)
+- Python 3.11+ virtual environment activated with dependencies installed
+- GitHub Copilot access (auth via `gh auth login` or `GITHUB_TOKEN` env var)
 - Hugo theme installed (`git submodule update --init` in `blog/`)
 
 ## Procedure
@@ -42,10 +42,11 @@ This ensures the pipeline fetches from the most relevant, current sources.
 Run a quick check:
 ```bash
 source venv/bin/activate
-python -c "from src.config import LLM_API_KEY; print('API key configured:', bool(LLM_API_KEY))"
+gh auth status
+python -c "from src.config import LLM_MODEL; print('LLM model:', LLM_MODEL)"
 ```
 
-If the key is missing, remind the user to set it up per `MANUAL_STEPS.md`.
+If `gh auth` fails, run `gh auth login` or set `GITHUB_TOKEN` env var.
 
 ### Step 2: Fetch News & Generate
 
@@ -58,8 +59,9 @@ This will:
 1. Read source config from `discovery.json` (keywords, RSS feeds, subreddits)
 2. Fetch from HackerNews, Dev.to, Reddit, and RSS feeds
 3. Rank by keyword relevance + recency + engagement, deduplicate
-4. Generate a blog post via Groq LLM (auto-falls back to Cerebras on rate limit)
-5. Write the post to `blog/content/posts/`
+4. Discover Feature Spotlight topic (dominant tools → changelogs → pick topic)
+5. Generate a blog post via GitHub Copilot SDK (agent reads past posts from disk)
+6. Write the post to `blog/content/posts/`
 
 ### Step 3: Review Output
 
@@ -110,6 +112,8 @@ Automated: GitHub Actions runs every Friday 9AM UTC (reads discovery.json, gener
 ## Troubleshooting
 
 - **No news items**: Check internet connectivity; some RSS feeds may be down. Verify `discovery.json` has valid sources.
-- **Rate limited on Groq**: Pipeline auto-falls back to Cerebras. If both fail, wait for daily token reset.
+- **No GitHub token**: Run `gh auth login` or set `GITHUB_TOKEN` env var.
+- **Copilot SDK errors**: Ensure Python 3.11+ and `github-copilot-sdk` is installed. Check `gh auth status`.
 - **Hugo build fails**: Ensure theme submodule is initialized: `git submodule update --init`
 - **Stale content**: Run `/discover-trends` to refresh keywords and sources in `discovery.json`.
+- **No spotlight topic**: This is normal — if no new features are found, the pipeline generates a news-only post.

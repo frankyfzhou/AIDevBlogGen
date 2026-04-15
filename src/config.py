@@ -22,21 +22,18 @@ CACHE_DIR = ROOT_DIR / ".cache"
 DISCOVERY_FILE = ROOT_DIR / "discovery.json"
 
 # ── LLM Configuration ────────────────────────────────────────────────────────
-# Supports OpenAI or any OpenAI-compatible API (e.g. Google Gemini)
-LLM_API_KEY = os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", ""))
-LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gemini-2.0-flash"))
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-
-# Fallback LLM — used when primary provider hits rate limits or quota
-LLM_FALLBACK_API_KEY = os.getenv("LLM_FALLBACK_API_KEY", "")
-LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "")
-LLM_FALLBACK_BASE_URL = os.getenv("LLM_FALLBACK_BASE_URL", "")
+# Uses GitHub Copilot SDK — model configurable, auth via GITHUB_TOKEN or gh keyring
+LLM_MODEL = os.getenv("LLM_MODEL", "claude-opus-4.6")
+LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "300"))  # seconds per LLM call
 
 # ── Fetcher Settings ─────────────────────────────────────────────────────────
-MAX_STORIES = 8  # Top N stories to include in a blog post
+MAX_STORIES = 5  # Top N stories to include in a blog post
 FETCH_TIMEOUT = 15  # Seconds per HTTP request
 CACHE_TTL_HOURS = 6
 HN_TOP_STORIES_LIMIT = 80  # How many HN stories to scan
+
+# ── Spotlight Settings ───────────────────────────────────────────────────────
+SPOTLIGHT_VELOCITY_THRESHOLD = 0.9  # If top story velocity > this, skip spotlight
 
 # ── AI-relevance keywords (case-insensitive matching) ────────────────────────
 # Fallback keywords — used only if discovery.json is missing

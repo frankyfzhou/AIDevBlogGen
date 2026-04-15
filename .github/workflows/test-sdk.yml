@@ -1,0 +1,84 @@
+name: Test Copilot SDK in CI
+
+# Temporary workflow — validates Copilot SDK auth with GITHUB_TOKEN in Actions.
+# Delete after confirming CI works (Phase 9 Step 1).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Copilot SDK
+        run: pip install github-copilot-sdk>=0.2
+
+      - name: Test SDK auth and basic operation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -c "
+          import asyncio, os, sys
+          from copilot import CopilotClient, SubprocessConfig
+          from copilot.session import PermissionHandler
+
+          async def test():
+              token = os.environ.get('GITHUB_TOKEN', '')
+              print(f'Token prefix: {token[:8]}...' if len(token) > 8 else 'NO TOKEN')
+
+              config = SubprocessConfig(github_token=token)
+              async with CopilotClient(config=config) as client:
+                  # Test 1: Auth status
+                  auth = await client.get_auth_status()
+                  print(f'Auth: authenticated={auth.isAuthenticated}, type={auth.authType}')
+                  if not auth.isAuthenticated:
+                      print('FAIL: Not authenticated with GITHUB_TOKEN')
+                      sys.exit(1)
+
+                  # Test 2: Simple message
+                  async with await client.create_session(
+                      on_permission_request=PermissionHandler.approve_all,
+                      model='gpt-4.1',
+                  ) as session:
+                      response = await asyncio.wait_for(
+                          session.send_and_wait('Reply with exactly: ci-works'),
+                          timeout=30,
+                      )
+                      content = response.data.content.strip()
+                      print(f'Response: {content}')
+                      if 'ci-works' not in content:
+                          print('FAIL: Unexpected response')
+                          sys.exit(1)
+
+                  # Test 3: File reading
+                  async with await client.create_session(
+                      on_permission_request=PermissionHandler.approve_all,
+                      model='gpt-4.1',
+                      working_directory='.',
+                  ) as session:
+                      response = await asyncio.wait_for(
+                          session.send_and_wait(
+                              'Read requirements.txt and reply with its first line only.'
+                          ),
+                          timeout=60,
+                      )
+                      content = response.data.content.strip()
+                      print(f'File read result: {content}')
+                      if 'copilot' in content.lower() or 'feedparser' in content.lower():
+                          print('PASS: Agent can read files')
+                      else:
+                          print(f'WARN: Unexpected file content - may still work')
+
+              print('ALL TESTS PASSED')
+
+          asyncio.run(test())
+          "

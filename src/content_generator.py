@@ -1,19 +1,17 @@
-"""LLM-powered blog post generation from ranked news items."""
+"""LLM-powered blog post generation via GitHub Copilot SDK."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import time
+import os
+import re
+import subprocess
 from datetime import datetime, timezone
 
-from openai import OpenAI, RateLimitError, BadRequestError, AuthenticationError
 from pydantic import BaseModel
 
-from .config import (
-    LLM_API_KEY, LLM_BASE_URL, LLM_MODEL,
-    LLM_FALLBACK_API_KEY, LLM_FALLBACK_BASE_URL, LLM_FALLBACK_MODEL,
-    NewsItem,
-)
+from .config import LLM_MODEL, LLM_TIMEOUT, ROOT_DIR, NewsItem
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +37,96 @@ class BlogPost(BaseModel):
     sections: list[BlogSection]
     conclusion: str
     sources: list[SourceLink]
+
+
+# ── JSON extraction ──────────────────────────────────────────────────────────
+
+def _extract_json(raw: str) -> str:
+    """Extract JSON from LLM response, stripping markdown fences if present.
+
+    Only strips fences if the response itself is wrapped in them.
+    Preserves code fences that appear *inside* JSON string values.
+    """
+    text = raw.strip()
+    # Only strip if the entire response is wrapped in fences
+    if text.startswith("```"):
+        # Remove opening fence line and closing fence
+        lines = text.split("\n")
+        # First line is ```json or ```
+        lines = lines[1:]
+        # Find last ``` and remove it
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].strip() == "```":
+                lines = lines[:i]
+                break
+        text = "\n".join(lines).strip()
+    return text
+
+
+# ── Copilot SDK LLM interface ───────────────────────────────────────────────
+
+def _get_github_token() -> str:
+    """Get GitHub token from env or gh CLI keyring."""
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if token:
+        return token
+    result = subprocess.run(
+        ["gh", "auth", "token"],
+        capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    raise RuntimeError(
+        "No GitHub token found. Set GITHUB_TOKEN env var or run 'gh auth login'."
+    )
+
+
+async def _call_llm_async(
+    prompt: str,
+    model: str,
+    working_directory: str | None = None,
+    system_message: str | None = None,
+    timeout: int = 300,
+) -> str:
+    """Make a single LLM call via the Copilot SDK. Returns raw response text."""
+    from copilot import CopilotClient, SubprocessConfig
+    from copilot.session import PermissionHandler, SystemMessageAppendConfig
+
+    token = _get_github_token()
+    config = SubprocessConfig(github_token=token)
+
+    async with CopilotClient(config=config) as client:
+        session_kwargs: dict = {
+            "on_permission_request": PermissionHandler.approve_all,
+            "model": model,
+        }
+        if working_directory:
+            session_kwargs["working_directory"] = working_directory
+        if system_message:
+            session_kwargs["system_message"] = SystemMessageAppendConfig(
+                content=system_message,
+            )
+
+        async with await client.create_session(**session_kwargs) as session:
+            response = await session.send_and_wait(prompt, timeout=timeout)
+            return response.data.content
+
+
+def call_llm(
+    prompt: str,
+    model: str | None = None,
+    working_directory: str | None = None,
+    system_message: str | None = None,
+    timeout: int | None = None,
+) -> str:
+    """Synchronous wrapper for _call_llm_async. Returns raw response text."""
+    return asyncio.run(_call_llm_async(
+        prompt=prompt,
+        model=model or LLM_MODEL,
+        working_directory=working_directory,
+        system_message=system_message,
+        timeout=timeout or LLM_TIMEOUT,
+    ))
 
 
 # ── Prompt construction ──────────────────────────────────────────────────────
@@ -70,6 +158,13 @@ Use standard markdown code fences with the "mermaid" language tag, e.g.:
 - Tags should be lowercase, hyphenated, SEO-friendly (e.g. "ai-coding", "llm-tools")
 - cover_keywords: provide 1-3 words for a relevant cover photo (e.g. "artificial intelligence", "robot coding")
 - sources: list ALL referenced URLs with a short descriptive title for each
+
+IMPORTANT: Respond ONLY with a valid JSON object matching this schema:
+{"title": "string", "description": "string", "tags": ["string"], \
+"cover_keywords": "string", \
+"introduction": "string", "sections": [{"heading": "string", "body": "string"}], \
+"conclusion": "string", "sources": [{"title": "string", "url": "string"}]}
+No markdown fences, no explanation — just raw JSON.
 """
 
 
@@ -119,98 +214,75 @@ Additionally, collect ALL referenced URLs into the "sources" list.
 
 # ── Generation ───────────────────────────────────────────────────────────────
 
-def _try_generate(
-    client: OpenAI,
-    model: str,
+SPOTLIGHT_SYSTEM_ADDENDUM = """
+When a Feature Spotlight topic is provided, include a dedicated "Feature Spotlight" \
+section covering:
+- What the feature is and why it matters for day-to-day development
+- Real, working code/config examples (not toy demos)
+- Gotchas, edge cases, and non-obvious behavior
+- How it composes with other features of the same tool
+- Cite the source docs/changelog inline
+
+Target audience: senior engineers who already use the tool daily.
+Skip basics. Go straight to practical depth. 800-1200 words for the spotlight section.
+
+The final JSON should include the spotlight as one of the sections (with a heading \
+like "Feature Spotlight: [Feature Name]").
+"""
+
+
+def generate_blog_post(
     news_items: list[NewsItem],
-    max_retries: int = 5,
+    news_json_path: str | None = None,
+    spotlight: object | None = None,
 ) -> BlogPost:
-    """Attempt generation with a single provider. Raises on exhaustion."""
-    use_structured = True
+    """Generate a structured blog post using GitHub Copilot SDK.
 
-    for attempt in range(max_retries):
-        try:
-            if use_structured:
-                response = client.beta.chat.completions.parse(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": _build_user_prompt(news_items)},
-                    ],
-                    response_format=BlogPost,
-                    temperature=0.7,
-                    max_tokens=4096,
-                )
-                post = response.choices[0].message.parsed
-                if post is not None:
-                    logger.info("Generated post: %s (%d sections)", post.title, len(post.sections))
-                    return post
-                raise RuntimeError("LLM returned empty structured output.")
-            else:
-                # Fallback: JSON mode with manual parsing
-                json_instruction = (
-                    "\n\nIMPORTANT: Respond ONLY with a valid JSON object matching this schema:\n"
-                    '{"title": "string", "description": "string", "tags": ["string"], '
-                    '"cover_keywords": "string", '
-                    '"introduction": "string", "sections": [{"heading": "string", "body": "string"}], '
-                    '"conclusion": "string", "sources": [{"title": "string", "url": "string"}]}\n'
-                    "No markdown, no code fences, just raw JSON."
-                )
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT + json_instruction},
-                        {"role": "user", "content": _build_user_prompt(news_items)},
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.7,
-                    max_tokens=4096,
-                )
-                raw = response.choices[0].message.content
-                data = json.loads(raw)
-                post = BlogPost(**data)
-                logger.info("Generated post (json fallback): %s (%d sections)", post.title, len(post.sections))
-                return post
-        except BadRequestError as exc:
-            if "response format" in str(exc).lower() or "json_schema" in str(exc).lower():
-                logger.info("Structured output not supported, falling back to JSON mode")
-                use_structured = False
-                continue
-            raise
-        except RateLimitError as exc:
-            wait = 2 ** attempt * 5
-            if attempt == max_retries - 1:
-                raise
-            logger.warning("Rate limited (attempt %d/%d). Waiting %ds...", attempt + 1, max_retries, wait)
-            time.sleep(wait)
+    News items are included directly in the prompt.
+    Past-post dedup is handled by the spotlight discovery step.
 
-    raise RuntimeError(f"Generation failed after {max_retries} retries with {model}.")
-
-
-def generate_blog_post(news_items: list[NewsItem]) -> BlogPost:
-    """Generate a structured blog post, falling back to a secondary provider if needed."""
-    if not LLM_API_KEY:
-        raise RuntimeError(
-            "LLM_API_KEY is not set. Add it to your .env file or environment."
-        )
-
-    # --- Primary provider ---
-    client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
+    If spotlight is provided (SpotlightTopic), the post includes a
+    Feature Spotlight deep-dive section.
+    """
     logger.info("Generating blog post with %s from %d news items...", LLM_MODEL, len(news_items))
 
-    try:
-        return _try_generate(client, LLM_MODEL, news_items)
-    except (RateLimitError, RuntimeError, AuthenticationError) as primary_exc:
-        if not LLM_FALLBACK_API_KEY:
-            raise RuntimeError(
-                f"Primary LLM failed ({primary_exc}) and no fallback is configured. "
-                "Set LLM_FALLBACK_API_KEY / LLM_FALLBACK_MODEL / LLM_FALLBACK_BASE_URL."
-            ) from primary_exc
+    system = SYSTEM_PROMPT
+    if spotlight:
+        system += SPOTLIGHT_SYSTEM_ADDENDUM
 
-        # --- Fallback provider ---
-        logger.warning(
-            "Primary LLM (%s) failed: %s — switching to fallback (%s)",
-            LLM_MODEL, primary_exc, LLM_FALLBACK_MODEL,
+    prompt = _build_user_prompt(news_items)
+
+    if spotlight:
+        prompt += f"""
+
+=== FEATURE SPOTLIGHT ===
+Include a Feature Spotlight section on this topic:
+- Tool: {spotlight.tool}
+- Feature: {spotlight.feature}
+- Source URL: {spotlight.source_url}
+- Why: {spotlight.justification}
+
+Write an accurate, detailed deep-dive based on the source docs.
+This spotlight section should be 800-1200 words. The news sections should be briefer \
+(2-3 stories, ~400-500 words total) to make room for the spotlight.
+"""
+
+    for attempt in range(2):
+        raw = call_llm(
+            prompt=prompt,
+            system_message=system,
         )
-        fallback_client = OpenAI(api_key=LLM_FALLBACK_API_KEY, base_url=LLM_FALLBACK_BASE_URL)
-        return _try_generate(fallback_client, LLM_FALLBACK_MODEL, news_items)
+        logger.debug("LLM raw response (first 200 chars): %s", repr(raw[:200]) if raw else "<empty>")
+        try:
+            data = json.loads(_extract_json(raw))
+            post = BlogPost(**data)
+            logger.info("Generated post: %s (%d sections)", post.title, len(post.sections))
+            return post
+        except (json.JSONDecodeError, ValueError) as exc:
+            if attempt == 0:
+                logger.warning("JSON parse failed (attempt 1): %s — retrying with stricter prompt", exc)
+                prompt += "\n\nPREVIOUS ATTEMPT FAILED TO PARSE. Return ONLY raw JSON. No markdown, no explanation."
+                continue
+            raise RuntimeError(f"Blog generation failed after 2 attempts: {exc}") from exc
+
+    raise RuntimeError("Blog generation failed unexpectedly.")
