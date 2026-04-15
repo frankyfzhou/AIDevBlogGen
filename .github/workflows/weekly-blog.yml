@@ -31,7 +31,7 @@ jobs:
         run: python -m src.main --no-push --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || 'gpt-4.1' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || 'claude-haiku-4.5' }}
           LLM_MODEL_HEAVY: ${{ vars.LLM_MODEL_HEAVY || 'claude-opus-4.6' }}
 
       - name: Commit and push new post
