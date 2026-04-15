@@ -1,6 +1,7 @@
 name: Test Copilot SDK in CI
 
-# Temporary workflow — validates Copilot SDK auth with GITHUB_TOKEN in Actions.
+# Temporary workflow — validates Copilot SDK auth in Actions.
+# Uses COPILOT_TOKEN (PAT) because ghs_ tokens don't authenticate with Copilot.
 # Delete after confirming CI works (Phase 9 Step 1).
 
 on:
@@ -24,7 +25,7 @@ jobs:
 
       - name: Test SDK auth and basic operation
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
         run: |
           python3 -c "
           import asyncio, os, sys

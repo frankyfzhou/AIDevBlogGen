@@ -30,7 +30,7 @@ jobs:
       - name: Generate blog post
         run: python -m src.main --no-push --verbose
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           LLM_MODEL: ${{ vars.LLM_MODEL || 'claude-opus-4.6' }}
 
       - name: Commit and push new post
