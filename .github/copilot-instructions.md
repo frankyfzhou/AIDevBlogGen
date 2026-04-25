@@ -32,12 +32,13 @@ This repository is an automated weekly blog generator focused on AI-assisted sof
 
 ## LLM Model Usage
 
-- **Two-model system:** `LLM_MODEL` (cheap) and `LLM_MODEL_HEAVY` (premium)
+- **Two-model system:** `LLM_MODEL` (cheap) and `LLM_MODEL_HEAVY` (standard)
 - `claude-haiku-4.5` (0 premium) — tool discovery, topic selection, news-only posts
-- `claude-opus-4.6` (3 premium/call) — blog generation with Feature Spotlight only
+- `claude-sonnet-4.6` (standard) — blog generation with Feature Spotlight only
+- If `LLM_MODEL_HEAVY` is unavailable (e.g. model retired), content_generator.py auto-falls back to `LLM_MODEL`
 - When testing locally, set both to `gpt-4.1`: `LLM_MODEL=gpt-4.1 LLM_MODEL_HEAVY=gpt-4.1`
 - For CI testing, set repo variables via `gh variable set` then delete after
-- Premium budget: ~3 per production run (only spotlight posts use heavy model)
+- Premium budget: ~0 per production run (sonnet-4.6 is standard tier)
 
 ## When Editing
 

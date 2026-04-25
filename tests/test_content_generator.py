@@ -245,6 +245,36 @@ class TestGenerateBlogPost:
         result = generate_blog_post(items)
         assert result.introduction.strip() != ""
         assert mock_call.call_count == 2
+
+    @patch("src.content_generator.call_llm")
+    def test_falls_back_to_light_model_when_heavy_unavailable(self, mock_call):
+        """If the heavy model reports 'not available', falls back to LLM_MODEL."""
+        from src.config import LLM_MODEL, LLM_MODEL_HEAVY
+
+        def side_effect(*args, **kwargs):
+            if kwargs.get("model") == LLM_MODEL_HEAVY:
+                raise RuntimeError("Session error: Execution failed: Error: Model is not available.")
+            return MOCK_BLOG_JSON
+
+        mock_call.side_effect = side_effect
+        items = [
+            NewsItem("Story", "https://a.com", "HN", "Summary",
+                     datetime.now(timezone.utc), 0.5, []),
+        ]
+        spotlight = MagicMock()
+        spotlight.tool = "GitHub Copilot"
+        spotlight.feature = "Agent Mode"
+        spotlight.source_url = "https://docs.github.com/copilot"
+        spotlight.justification = "New feature"
+        spotlight.source_content = "Agent mode details."
+        result = generate_blog_post(items, spotlight=spotlight)
+        assert result.title == "AI Dev Weekly: The Rise of Coding Agents"
+        # Should have been called twice: once with heavy model (fails), once with light model
+        assert mock_call.call_count == 2
+        first_call_model = mock_call.call_args_list[0][1]["model"]
+        second_call_model = mock_call.call_args_list[1][1]["model"]
+        assert first_call_model == LLM_MODEL_HEAVY
+        assert second_call_model == LLM_MODEL
     @patch.dict("os.environ", {"GITHUB_TOKEN": "gho_test123"})
     def test_reads_from_env(self):
         from src.content_generator import _get_github_token

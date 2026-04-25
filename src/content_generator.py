@@ -361,11 +361,28 @@ This spotlight section should be 800-1200 words. The news sections should be bri
 """
 
     for attempt in range(2):
-        raw = call_llm(
-            prompt=prompt,
-            model=active_model,
-            system_message=system,
-        )
+        try:
+            raw = call_llm(
+                prompt=prompt,
+                model=active_model,
+                system_message=system,
+            )
+        except Exception as exc:
+            # If the configured heavy model is unavailable, fall back to the cheap model
+            # so the pipeline doesn't crash entirely (e.g. when a model is retired).
+            if active_model != LLM_MODEL and "not available" in str(exc).lower():
+                logger.warning(
+                    "Heavy model %s unavailable (%s) — falling back to %s",
+                    active_model, exc, LLM_MODEL,
+                )
+                active_model = LLM_MODEL
+                raw = call_llm(
+                    prompt=prompt,
+                    model=active_model,
+                    system_message=system,
+                )
+            else:
+                raise
         logger.debug("LLM raw response (first 200 chars): %s", repr(raw[:200]) if raw else "<empty>")
         try:
             data = json.loads(_extract_json(raw))

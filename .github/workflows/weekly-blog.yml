@@ -32,7 +32,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           LLM_MODEL: ${{ vars.LLM_MODEL || 'claude-haiku-4.5' }}
-          LLM_MODEL_HEAVY: ${{ vars.LLM_MODEL_HEAVY || 'claude-opus-4.6' }}
+          LLM_MODEL_HEAVY: ${{ vars.LLM_MODEL_HEAVY || 'claude-sonnet-4.6' }}
 
       - name: Commit and push new post
         uses: stefanzweifel/git-auto-commit-action@v5

@@ -26,7 +26,7 @@ DISCOVERY_FILE = ROOT_DIR / "discovery.json"
 # LLM_MODEL: cheap model for tool discovery, topic selection, news-only posts
 # LLM_MODEL_HEAVY: premium model used ONLY for blog generation with a Feature Spotlight
 LLM_MODEL = os.getenv("LLM_MODEL", "claude-haiku-4.5")
-LLM_MODEL_HEAVY = os.getenv("LLM_MODEL_HEAVY", "claude-opus-4.6")
+LLM_MODEL_HEAVY = os.getenv("LLM_MODEL_HEAVY", "claude-sonnet-4.6")
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "300"))  # seconds per LLM call
 
 # ── Fetcher Settings ─────────────────────────────────────────────────────────

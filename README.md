@@ -84,7 +84,7 @@ cd blog && hugo server -D
 | Model | Usage | Premium Requests |
 |-------|-------|-----------------|
 | `claude-haiku-4.5` | Tool discovery, topic selection, news-only posts | 0 |
-| `claude-opus-4.6` | Blog generation with Feature Spotlight | 3/call |
+| `claude-sonnet-4.6` | Blog generation with Feature Spotlight | 0 |
 
 ## Cost
 
