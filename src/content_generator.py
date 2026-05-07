@@ -1,4 +1,4 @@
-"""LLM-powered blog post generation via GitHub Copilot SDK."""
+"""LLM-powered blog post generation via GitHub Models API (OpenAI-compatible)."""
 from __future__ import annotations
 
 import asyncio
@@ -135,7 +135,10 @@ def _extract_json(raw: str) -> str:
     return text
 
 
-# ── Copilot SDK LLM interface ───────────────────────────────────────────────
+# ── GitHub Models API LLM interface ─────────────────────────────────────────
+
+_GITHUB_MODELS_BASE_URL = "https://models.github.ai/inference"
+
 
 def _get_github_token() -> str:
     """Get GitHub token from env or gh CLI keyring."""
@@ -160,28 +163,25 @@ async def _call_llm_async(
     system_message: str | None = None,
     timeout: int = 300,
 ) -> str:
-    """Make a single LLM call via the Copilot SDK. Returns raw response text."""
-    from copilot import CopilotClient, SubprocessConfig
-    from copilot.session import PermissionHandler, SystemMessageAppendConfig
+    """Make a single LLM call via the GitHub Models API. Returns raw response text."""
+    from openai import AsyncOpenAI
 
     token = _get_github_token()
-    config = SubprocessConfig(github_token=token)
+    client = AsyncOpenAI(
+        base_url=_GITHUB_MODELS_BASE_URL,
+        api_key=token,
+    )
 
-    async with CopilotClient(config=config) as client:
-        session_kwargs: dict = {
-            "on_permission_request": PermissionHandler.approve_all,
-            "model": model,
-        }
-        if working_directory:
-            session_kwargs["working_directory"] = working_directory
-        if system_message:
-            session_kwargs["system_message"] = SystemMessageAppendConfig(
-                content=system_message,
-            )
+    messages: list[dict] = []
+    if system_message:
+        messages.append({"role": "system", "content": system_message})
+    messages.append({"role": "user", "content": prompt})
 
-        async with await client.create_session(**session_kwargs) as session:
-            response = await session.send_and_wait(prompt, timeout=timeout)
-            return response.data.content
+    response = await asyncio.wait_for(
+        client.chat.completions.create(model=model, messages=messages),
+        timeout=timeout,
+    )
+    return response.choices[0].message.content or ""
 
 
 def call_llm(
